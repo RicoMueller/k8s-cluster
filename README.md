@@ -141,68 +141,6 @@ Renovate automatically monitors:
 - **Automated Testing:** Renovate PRs validated before merge
 - **Self-Documenting:** Declarative YAML serves as living documentation
 
-## Getting Started
-
-### Prerequisites
-
-- Kubernetes cluster (v1.24+)
-- `kubectl` configured for cluster access
-- Flux CLI installed
-- SOPS and Age key pair for secrets
-
-### Bootstrap New Environment
-
-```bash
-# Install Flux on cluster
-flux bootstrap github \
-  --owner=RicoMueller \
-  --repository=k8s-cluster \
-  --branch=main \
-  --path=clusters/staging \
-  --personal
-
-# Create SOPS Age secret
-kubectl create secret generic sops-age \
-  --from-file=age.agekey=/path/to/age.key \
-  --namespace=flux-system
-
-# Flux will automatically sync all resources
-flux get kustomizations --watch
-```
-
-### Managing Applications
-
-```bash
-# Add new application
-mkdir -p apps/base/myapp apps/staging/myapp
-# Create deployment, service, namespace YAML files
-# Add to apps/staging/kustomization.yaml
-git commit && git push
-
-# Update existing application
-# Edit version in apps/staging/myapp/deployment.yaml
-git commit && git push
-
-# Monitor reconciliation
-flux get helmreleases -A
-kubectl get kustomizations -n flux-system
-```
-
-## Monitoring & Observability
-
-### Access Grafana
-
-- **URL:** https://grs.rm-it.org
-- **Credentials:** admin / rico
-- **Pre-configured Dashboards:** Kubernetes cluster metrics, node health, pod resources
-
-### Prometheus Queries
-
-Access Prometheus UI through Grafana or port-forward:
-```bash
-kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
-```
-
 ## Project Highlights
 
 This repository demonstrates:
@@ -241,16 +179,18 @@ Review and merge Renovate PRs to keep cluster up-to-date.
 4. Flux restores entire cluster state
 5. Restore PVC data from backups if needed
 
-## Contributing
+## About This Project
 
-This is a personal infrastructure repository, but the patterns and structure can be referenced for similar projects.
+This repository is a portfolio project showcasing modern DevOps and platform engineering practices. It demonstrates my expertise in:
 
-### Repository Standards
+- **GitOps Methodologies:** Production-ready Flux CD implementation
+- **Infrastructure as Code:** Declarative Kubernetes resource management
+- **Cloud-Native Technologies:** Kubernetes, Helm, Kustomize, and container orchestration
+- **Security Best Practices:** Secrets encryption, secure authentication, and security contexts
+- **Automation & CI/CD:** Automated dependency management and self-healing infrastructure
+- **System Architecture:** Multi-environment design patterns and separation of concerns
 
-- All changes via pull requests
-- Validate YAML before committing
-- Test changes in staging environment
-- Document significant architectural changes
+The repository serves as a practical example of building and maintaining production-grade Kubernetes infrastructure using industry best practices. Feel free to explore the code and architecture as a reference for similar implementations.
 
 ## License
 
