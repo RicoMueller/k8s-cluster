@@ -1,0 +1,45 @@
+kind: Cluster
+name: pantheon
+kubernetes:
+  version: v1.35.4
+talos:
+  version: v1.12.7
+patches:
+  - name: disable-cni
+    file: patches/cni.yaml
+  - name: disable-kube-proxy
+    file: patches/disable-kube-proxy.yaml
+---
+kind: ControlPlane
+machines:
+  - 0cd3776d-7f35-edf6-9d4c-1a4c981d13fc
+  - 9064906f-dd27-0f75-5891-747b7cbeb187
+  - ddd81daf-3cea-d36c-8a3a-654d17a681ec
+---
+kind: Workers
+machines:
+  - 27e4a57f-dff8-38c7-2d5c-f82ffa0cff26
+  - 6e05049d-634f-1a50-ed5b-11c26260dae9
+  - 75d53c0a-93d2-07a8-eefd-0f97d059b493
+  - f279abe8-2293-4608-9d08-26c24baf379d
+---
+kind: Machine
+name: 0cd3776d-7f35-edf6-9d4c-1a4c981d13fc
+---
+kind: Machine
+name: 27e4a57f-dff8-38c7-2d5c-f82ffa0cff26
+---
+kind: Machine
+name: 6e05049d-634f-1a50-ed5b-11c26260dae9
+---
+kind: Machine
+name: 75d53c0a-93d2-07a8-eefd-0f97d059b493
+---
+kind: Machine
+name: 9064906f-dd27-0f75-5891-747b7cbeb187
+---
+kind: Machine
+name: ddd81daf-3cea-d36c-8a3a-654d17a681ec
+---
+kind: Machine
+name: f279abe8-2293-4608-9d08-26c24baf379d
