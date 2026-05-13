@@ -2,6 +2,13 @@ kind: Cluster
 name: pantheon
 kubernetes:
   version: v1.35.4
+  manifests:
+    - name: gateway-api-crds
+      mode: full
+      file: manifests/gateway-api-crds.yaml
+    - name: cilium
+      mode: full
+      file: manifests/cilium.yaml
 talos:
   version: v1.12.7
 patches:
