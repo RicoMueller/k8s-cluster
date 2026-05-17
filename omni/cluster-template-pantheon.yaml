@@ -1,3 +1,4 @@
+# Managed by GitOps - do not edit in UI
 kind: Cluster
 name: pantheon
 kubernetes:
