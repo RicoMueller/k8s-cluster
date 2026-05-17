@@ -12,7 +12,7 @@ jobs:
     name: Validate cluster template
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Validate cluster template
         uses: jdmcmahan/omnictl-action@v1.79.0
