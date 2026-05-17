@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "omni/**"
+    workflow_dispatch:
 
 jobs:
   validate:
