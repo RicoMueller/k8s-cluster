@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - "omni/**"
-    workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   sync:
