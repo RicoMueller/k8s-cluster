@@ -1,0 +1,22 @@
+name: Validate Omni Cluster Template
+
+on:
+  pull_request:
+    paths:
+      - "omni/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    name: Validate cluster template
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate cluster template
+        uses: jdmcmahan/omnictl-action@v1
+        with:
+          working-directory: ./omni/
+          omni-endpoint: ${{ secrets.OMNI_ENDPOINT }}
+          omni-service-account-key: ${{ secrets.OMNI_SERVICE_ACCOUNT_KEY }}
+          command: omnictl cluster template -f cluster-template-pantheon.yaml validate

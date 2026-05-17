@@ -1,0 +1,23 @@
+name: Sync Omni Cluster Template
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "omni/**"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    name: Sync cluster template with Sidero Omni
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Sync cluster template
+        uses: jdmcmahan/omnictl-action@v1
+        with:
+          working-directory: ./omni/
+          omni-endpoint: ${{ secrets.OMNI_ENDPOINT }}
+          omni-service-account-key: ${{ secrets.OMNI_SERVICE_ACCOUNT_KEY }}
+          command: omnictl cluster template -f cluster-template-pantheon.yaml sync --verbose
