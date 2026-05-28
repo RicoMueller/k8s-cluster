@@ -1,0 +1,7 @@
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: pantheon-pool
+spec:
+  blocks:
+    - cidr: 192.168.178.224/28
