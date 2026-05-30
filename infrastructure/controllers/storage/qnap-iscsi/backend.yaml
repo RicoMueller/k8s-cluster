@@ -1,0 +1,20 @@
+  apiVersion: trident.qnap.io/v1
+   kind: TridentBackendConfig
+   metadata:
+     name: backend-qnap
+     namespace: trident
+   spec:
+     version: 1
+     storageDriverName: qnap-iscsi
+     backendName: qnap-iscsi
+     credentials:
+       name: backend-qnap-secret
+     storage:
+       - labels:
+           performance: standard
+         serviceLevel: pool1
+         features:
+           tiering: "Disable"
+         defaults:
+           spaceAllocation: "true"
+           snapshotPolicy: none
