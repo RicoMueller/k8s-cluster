@@ -5,5 +5,4 @@ resources:
   - namespace.yaml
   - secret.yaml
   - helmrelease.yaml
-  - backend.yaml
   - storageclass.yaml
