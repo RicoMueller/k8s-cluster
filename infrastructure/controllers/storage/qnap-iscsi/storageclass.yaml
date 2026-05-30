@@ -9,5 +9,4 @@ reclaimPolicy: Delete
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
 parameters:
-  selector: "performance=standard"
   fsType: ext4

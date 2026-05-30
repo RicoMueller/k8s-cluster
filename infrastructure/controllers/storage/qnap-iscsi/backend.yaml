@@ -5,16 +5,7 @@ metadata:
   namespace: trident
 spec:
   version: 1
-  storageDriverName: qnap-iscsi
-  backendName: qnap-iscsi
+  storageDriverName: qnap-nas
+  backendName: pantheon-qnap
   credentials:
     name: backend-qnap-secret
-  storage:
-    - labels:
-        performance: standard
-      serviceLevel: pool1 # MUSS dem QNAP-internen Pool-Namen entsprechen!
-      features:
-        tiering: "Disable" # einzelner Pool, kein Tiering
-      defaults:
-        spaceAllocation: "true"
-        snapshotPolicy: none
