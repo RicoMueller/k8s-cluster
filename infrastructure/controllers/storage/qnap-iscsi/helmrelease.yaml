@@ -1,14 +1,3 @@
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: GitRepository
-metadata:
-  name: qnap-csi
-  namespace: trident
-spec:
-  interval: 1h
-  url: https://github.com/qnap-dev/QNAP-CSI-PlugIn
-  ref:
-    branch: main
----
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -18,7 +7,8 @@ spec:
   interval: 1h
   chart:
     spec:
-      chart: Helm/trident
+      chart: ./infrastructure/controllers/storage/qnap-iscsi/chart
       sourceRef:
         kind: GitRepository
-        name: qnap-csi
+        name: flux-system
+        namespace: flux-system
