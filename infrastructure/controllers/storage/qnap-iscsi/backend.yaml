@@ -9,3 +9,5 @@ spec:
   backendName: pantheon-qnap
   credentials:
     name: backend-qnap-secret
+  storage:
+    - serviceLevel: pool1
