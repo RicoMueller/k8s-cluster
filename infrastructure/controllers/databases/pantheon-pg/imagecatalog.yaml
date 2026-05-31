@@ -1,0 +1,10 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ImageCatalog
+metadata:
+  name: postgresql
+  namespace: databases
+spec:
+  images:
+    # renovate: datasource=docker depName=ghcr.io/cloudnative-pg/postgresql
+    - major: 18
+      image: ghcr.io/cloudnative-pg/postgresql:18.4-standard-trixie
