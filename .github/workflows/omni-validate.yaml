@@ -8,16 +8,15 @@ on:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, omni-lan]
     name: Validate cluster template
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
       - name: Validate cluster template
-        uses: jdmcmahan/omnictl-action@v1.79.0
-        with:
-          working-directory: ./omni/
-          omni-endpoint: ${{ secrets.OMNI_ENDPOINT }}
-          omni-service-account-key: ${{ secrets.OMNI_SERVICE_ACCOUNT_KEY }}
-          command: omnictl cluster template -f cluster-template-pantheon.yaml validate
+        working-directory: ./omni/
+        env:
+          OMNI_ENDPOINT: ${{ secrets.OMNI_ENDPOINT }}
+          OMNI_SERVICE_ACCOUNT_KEY: ${{ secrets.OMNI_SERVICE_ACCOUNT_KEY }}
+        run: omnictl cluster template -f cluster-template-pantheon.yaml validate
