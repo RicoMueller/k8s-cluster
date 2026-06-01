@@ -34,26 +34,28 @@ This project demonstrates Infrastructure-as-Code (IaC) best practices by managin
 ```
 k8s-cluster/
 ├── clusters/
-│   └── staging/              # Cluster bootstrap configuration
-│       ├── flux-system/      # Flux CD components
-│       ├── infrastructure.yaml
-│       ├── apps.yaml
-│       └── monitoring.yaml
+│   ├── pantheon/             # Active production cluster (Flux bootstrap + Kustomizations)
+│   │   ├── flux-system/      # Flux CD components
+│   │   ├── infrastructure-databases.yaml
+│   │   ├── infrastructure-databases-cluster.yaml
+│   │   ├── infrastructure-networking.yaml
+│   │   ├── infrastructure-storage.yaml
+│   │   └── infrastructure-renovate.yaml
+│   └── legacy/               # Archived pre-Pantheon setup (not reconciled)
 ├── apps/                     # Application deployments
-│   ├── base/                 # Environment-agnostic templates
-│   │   ├── audiobookshelf/
-│   │   └── linkding/
-│   └── staging/              # Staging environment overlays
-│       ├── audiobookshelf/
-│       └── linkding/
-├── infrastructure/           # Infrastructure components
+│   ├── pantheon/             # Active cluster overlays
+│   └── legacy/               # Archived (reference only)
+├── infrastructure/
 │   └── controllers/
-│       ├── base/
-│       └── staging/
-├── monitoring/               # Observability stack
-│   ├── configs/             # Monitoring configurations
-│   └── controllers/         # Prometheus & Grafana
-└── renovate.json            # Automated update configuration
+│       ├── databases/        # CloudNativePG operator + pantheon-pg cluster
+│       ├── networking/       # Cilium L2 / LB pools + pantheon-gateway
+│       ├── storage/          # QNAP iSCSI (Trident) CSI
+│       ├── renovate/         # Self-hosted Renovate CronJob
+│       └── legacy/           # Archived (reference only)
+├── omni/                     # Talos / Omni machine config & manifests
+├── legacy/                   # Archived monitoring stack
+├── renovate.json             # Renovate configuration
+└── .sops.yaml                # SOPS encryption rules
 ```
 
 ## Deployed Services
@@ -201,4 +203,4 @@ This configuration is provided as-is for reference purposes.
 **Maintained by:** Rico Mueller
 **Repository:** [RicoMueller/k8s-cluster](https://github.com/RicoMueller/k8s-cluster)
 **GitOps Tool:** Flux CD v2.7.5
-**Last Updated:** December 2025
+**Last Updated:** June 2026
