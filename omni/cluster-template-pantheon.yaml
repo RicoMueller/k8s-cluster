@@ -1,4 +1,4 @@
-# Managed by GitOps - do not edit in UI
+# Managed by GitOps - do not edit in UI (fully versioned)
 kind: Cluster
 name: pantheon
 kubernetes:
