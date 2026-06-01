@@ -1,8 +1,15 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits"
+  ],
   "kubernetes": {
     "fileMatch": [
       "\\.yaml$"
     ]
-  }
+  },
+  "ignorePaths": [
+    "**/flux-system/gotk-components.yaml"
+  ]
 }

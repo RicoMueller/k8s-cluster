@@ -5,12 +5,15 @@
 replicaCount: 1
 
 tridentOperator:
+  # renovate: datasource=docker depName=qnapsystem/qnap-csi-operator
   image: qnapsystem/qnap-csi-operator:v1.6.0
+  # renovate: datasource=docker depName=qnapsystem/qnap-csi-backend-qts-sidecar
   cgiServerImage : qnapsystem/qnap-csi-backend-qts-sidecar:v1.6.0
   imagePullPolicy: IfNotPresent
   logLevel: debug
 
 tridentOrchestrator:
+  # renovate: datasource=docker depName=qnapsystem/qnap-csi
   image: qnapsystem/qnap-csi:v1.6.0
   debug: true
 
