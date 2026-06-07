@@ -190,7 +190,7 @@ spec:
             runAsUser: 1000
             seccompProfile:
               type: RuntimeDefault
-          image: registry.k8s.io/metrics-server/metrics-server:v0.8.0 # renovate: datasource=docker depName=registry.k8s.io/metrics-server/metrics-server
+          image: registry.k8s.io/metrics-server/metrics-server:v0.8.1 # renovate: datasource=docker depName=registry.k8s.io/metrics-server/metrics-server
           imagePullPolicy: IfNotPresent
           args:
             - --secure-port=10250
