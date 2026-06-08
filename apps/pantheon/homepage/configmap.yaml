@@ -26,6 +26,7 @@ data:
   custom.css: ""
   custom.js: ""
   docker.yaml: ""
+  proxmox.yaml: ""
   services.yaml: |
     # Cluster-Apps werden automatisch per HTTPRoute-Annotation entdeckt (siehe Teil C).
     # Dieser Block ist nur fuer externe Dienste OHNE HTTPRoute im Cluster gedacht.
