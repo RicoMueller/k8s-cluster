@@ -5,12 +5,6 @@ metadata:
   namespace: homepage
   labels:
     app.kubernetes.io/name: homepage
-  annotations:
-    gethomepage.dev/enabled: "true"
-    gethomepage.dev/name: Homepage
-    gethomepage.dev/description: Pantheon Dashboard
-    gethomepage.dev/group: Cluster Management
-    gethomepage.dev/icon: homepage.png
 spec:
   parentRefs:
     - name: pantheon-gateway

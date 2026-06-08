@@ -54,7 +54,7 @@ data:
             href: https://192.168.178.160:8006/
             description: VM-Host
         - Sidero Omni:
-            icon: talos-linux.png
+            icon: talos.png
             href: https://omni.rm-it.org/
             description: Cluster-Management
     - Netzwerk:
@@ -83,9 +83,6 @@ data:
         - GitHub:
             - abbr: GH
               href: https://github.com/RicoMueller/k8s-cluster
-        - Omni:
-            - abbr: OM
-              href: https://omni.rm-it.org
   widgets.yaml: |
     - kubernetes:
         cluster:
