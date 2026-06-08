@@ -8,13 +8,24 @@ metadata:
 data:
   kubernetes.yaml: |
     mode: cluster
-    gateway: true          # HTTPRoute-Auto-Discovery (Architekturentscheidung 2)
-    ingress: false         # Pantheon nutzt keine Ingress-Resources
+    gateway: true
+    ingress: false
   settings.yaml: |
     title: Pantheon
     headerStyle: clean
+    background:
+      image: https://images.unsplash.com/photo-1644088379091-d574269d422f?q=80&w=2186&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D
+      blur: sm
+      saturate: 50
+      brightness: 50
+      opacity: 40
+    quicklaunch:
+      provider: custom
+      url: https://www.ecosia.org/search?q=
+      target: _blank
+      suggestionUrl: https://ac.ecosia.org/autocomplete?type=list&q=
     layout:
-      Cluster Management:
+      Services:
         style: row
         columns: 3
       Infrastruktur:
@@ -28,35 +39,43 @@ data:
   docker.yaml: ""
   proxmox.yaml: ""
   services.yaml: |
-    # Cluster-Apps werden automatisch per HTTPRoute-Annotation entdeckt (siehe Teil C).
-    # Dieser Block ist nur fuer externe Dienste OHNE HTTPRoute im Cluster gedacht.
+    - Services:
+        - Paperless-ngx:
+            icon: paperless-ngx.png
+            href: http://192.168.178.42:8010/
+            description: Dokumentenmanagement (noch auf QNAP)
     - Infrastruktur:
         - QNAP NAS:
+            icon: qnap.png
             href: http://192.168.178.42:8080/
             description: TS-453B Nostromo
         - Proxmox VE:
+            icon: proxmox.png
             href: https://192.168.178.160:8006/
             description: VM-Host
         - Sidero Omni:
+            icon: talos-linux.png
             href: https://omni.rm-it.org/
             description: Cluster-Management
-        - Paperless-ngx:
-            href: http://192.168.178.42:8010/
-            description: noch auf QNAP - nach Cluster-Migration entfernen
     - Netzwerk:
         - FRITZ!Box:
+            icon: fritzbox.png
             href: http://192.168.178.1/
             description: Internet-Gateway
         - AdGuard Home:
+            icon: adguard-home.png
             href: http://192.168.178.53/
             description: DNS-Filter
         - MikroTik Switching:
+            icon: mikrotik.png
             href: http://192.168.178.144/
             description: RouterOS
         - MikroTik Kubernetes:
+            icon: mikrotik.png
             href: http://192.168.178.171/
             description: RouterOS
         - Netgear Switch:
+            icon: netgear.png
             href: http://192.168.178.45/
             description: Managed Switch
   bookmarks.yaml: |
@@ -76,15 +95,9 @@ data:
           showLabel: true
           label: "Pantheon"
         nodes:
-          show: true
-          cpu: true
-          memory: true
-          showLabel: true
-    - resources:
-        backend: resources
-        expanded: true
-        cpu: true
-        memory: true
+          show: false
     - search:
-        provider: duckduckgo
+        provider: custom
+        url: https://www.ecosia.org/search?q=
+        suggestionUrl: https://ac.ecosia.org/autocomplete?type=list&q=
         target: _blank
