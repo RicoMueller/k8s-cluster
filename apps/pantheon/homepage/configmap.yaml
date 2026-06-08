@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage
+  namespace: homepage
+  labels:
+    app.kubernetes.io/name: homepage
+data:
+  kubernetes.yaml: |
+    mode: cluster
+    gateway: true          # HTTPRoute-Auto-Discovery (Architekturentscheidung 2)
+    ingress: false         # Pantheon nutzt keine Ingress-Resources
+  settings.yaml: |
+    title: Pantheon
+    headerStyle: clean
+    layout:
+      Cluster Management:
+        style: row
+        columns: 3
+      Infrastruktur:
+        style: row
+        columns: 4
+      Netzwerk:
+        style: row
+        columns: 4
+  custom.css: ""
+  custom.js: ""
+  docker.yaml: ""
+  services.yaml: |
+    # Cluster-Apps werden automatisch per HTTPRoute-Annotation entdeckt (siehe Teil C).
+    # Dieser Block ist nur fuer externe Dienste OHNE HTTPRoute im Cluster gedacht.
+    - Infrastruktur:
+        - QNAP NAS:
+            href: http://192.168.178.42:8080/
+            description: TS-453B Nostromo
+        - Proxmox VE:
+            href: https://192.168.178.160:8006/
+            description: VM-Host
+        - Sidero Omni:
+            href: https://omni.rm-it.org/
+            description: Cluster-Management
+        - Paperless-ngx:
+            href: http://192.168.178.42:8010/
+            description: noch auf QNAP - nach Cluster-Migration entfernen
+    - Netzwerk:
+        - FRITZ!Box:
+            href: http://192.168.178.1/
+            description: Internet-Gateway
+        - AdGuard Home:
+            href: http://192.168.178.53/
+            description: DNS-Filter
+        - MikroTik Switching:
+            href: http://192.168.178.144/
+            description: RouterOS
+        - MikroTik Kubernetes:
+            href: http://192.168.178.171/
+            description: RouterOS
+        - Netgear Switch:
+            href: http://192.168.178.45/
+            description: Managed Switch
+  bookmarks.yaml: |
+    - Entwicklung:
+        - GitHub:
+            - abbr: GH
+              href: https://github.com/RicoMueller/k8s-cluster
+        - Omni:
+            - abbr: OM
+              href: https://omni.rm-it.org
+  widgets.yaml: |
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+          label: "Pantheon"
+        nodes:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+    - resources:
+        backend: resources
+        expanded: true
+        cpu: true
+        memory: true
+    - search:
+        provider: duckduckgo
+        target: _blank
