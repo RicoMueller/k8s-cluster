@@ -11,3 +11,7 @@ spec:
   path: ./apps/pantheon/homepage
   prune: true
   wait: false
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
