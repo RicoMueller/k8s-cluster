@@ -43,7 +43,11 @@ data:
         - Paperless-ngx:
             icon: paperless-ngx.png
             href: http://192.168.178.42:8010/
-            description: Dokumentenmanagement (noch auf QNAP)
+            description: Dokumentenmanagement
+            widget:
+              type: paperlessngx
+              url: http://192.168.178.42:8010
+              key: "{{HOMEPAGE_VAR_PAPERLESS_TOKEN}}"
     - Infrastruktur:
         - QNAP NAS:
             icon: qnap.png
@@ -53,6 +57,11 @@ data:
             icon: proxmox.png
             href: https://192.168.178.160:8006/
             description: VM-Host
+            widget:
+              type: proxmox
+              url: https://192.168.178.160:8006
+              username: "{{HOMEPAGE_VAR_PROXMOX_TOKEN_ID}}"
+              password: "{{HOMEPAGE_VAR_PROXMOX_TOKEN_SECRET}}"
         - Sidero Omni:
             icon: talos.png
             href: https://omni.rm-it.org/
@@ -66,6 +75,11 @@ data:
             icon: adguard-home.png
             href: http://192.168.178.53/
             description: DNS-Filter
+            widget:
+              type: adguard
+              url: http://192.168.178.53
+              username: "{{HOMEPAGE_VAR_ADGUARD_USERNAME}}"
+              password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
         - MikroTik Switching:
             icon: mikrotik.png
             href: http://192.168.178.144/
