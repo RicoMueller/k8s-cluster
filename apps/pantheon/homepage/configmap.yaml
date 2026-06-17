@@ -53,6 +53,12 @@ data:
             icon: qnap.png
             href: http://192.168.178.42:8080/
             description: TS-453B Nostromo
+            widget:
+              type: qnap
+              url: http://192.168.178.42:8080
+              username: "{{HOMEPAGE_VAR_QNAP_USERNAME}}"
+              password: "{{HOMEPAGE_VAR_QNAP_PASSWORD}}"
+              fields: ["cpuUsage", "memUsage", "systemTempC", "poolUsage"]
         - Proxmox VE:
             icon: proxmox.png
             href: https://192.168.178.160:8006/
@@ -71,6 +77,9 @@ data:
             icon: fritzbox.png
             href: http://192.168.178.1/
             description: Internet-Gateway
+            widget:
+              type: fritzbox
+              url: http://192.168.178.1
         - AdGuard Home:
             icon: adguard-home.png
             href: http://192.168.178.53/
@@ -84,10 +93,20 @@ data:
             icon: mikrotik.png
             href: http://192.168.178.144/
             description: RouterOS
+            widget:
+              type: mikrotik
+              url: https://192.168.178.144
+              username: "{{HOMEPAGE_VAR_MIKROTIK_SWITCHING_USERNAME}}"
+              password: "{{HOMEPAGE_VAR_MIKROTIK_SWITCHING_PASSWORD}}"
         - MikroTik Kubernetes:
             icon: mikrotik.png
             href: http://192.168.178.171/
             description: RouterOS
+            widget:
+              type: mikrotik
+              url: https://192.168.178.171
+              username: "{{HOMEPAGE_VAR_MIKROTIK_KUBERNETES_USERNAME}}"
+              password: "{{HOMEPAGE_VAR_MIKROTIK_KUBERNETES_PASSWORD}}"
         - Netgear Switch:
             icon: netgear.png
             href: http://192.168.178.45/
