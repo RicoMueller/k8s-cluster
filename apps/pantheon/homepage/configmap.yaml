@@ -53,12 +53,6 @@ data:
             icon: qnap.png
             href: http://192.168.178.42:8080/
             description: TS-453B Nostromo
-            widget:
-              type: qnap
-              url: http://192.168.178.42:8080
-              username: "{{HOMEPAGE_VAR_QNAP_USERNAME}}"
-              password: "{{HOMEPAGE_VAR_QNAP_PASSWORD}}"
-              fields: ["cpuUsage", "memUsage", "systemTempC", "poolUsage"]
         - Proxmox VE:
             icon: proxmox.png
             href: https://192.168.178.160:8006/
