@@ -11,6 +11,11 @@ spec:
     major: 18
   instances: 2
   enableSuperuserAccess: true
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: pantheon-pg-store
   superuserSecret:
     name: pantheon-pg-superuser
   postgresql:
