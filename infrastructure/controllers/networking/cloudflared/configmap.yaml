@@ -5,7 +5,7 @@ metadata:
   namespace: cloudflare
 data:
   config.yaml: |
-    tunnel: pantheon-apps
+    tunnel: f67d44d7-f8e6-4ebd-abad-6bb436226a68
     credentials-file: /etc/cloudflared/creds/credentials.json
     no-autoupdate: true
     ingress:
