@@ -4,3 +4,4 @@ resources:
   - lb-ip-pool.yaml
   - l2-announcement-policy.yaml
   - pantheon-gateway.yaml
+  - cloudflared
