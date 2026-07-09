@@ -9,3 +9,6 @@ resources:
   - cluster.yaml
   - objectstore.yaml
   - scheduledbackup.yaml
+  - paperless-db-role-secret.yaml
+  - paperless-role.yaml
+  - paperless-database.yaml
