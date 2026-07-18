@@ -104,20 +104,22 @@ spec:
             httpGet:
               path: /accounts/login/
               port: 8000
+              # Kubelet fragt mit der Pod-IP im Host-Header an -> Django lehnt
+              # das wegen ALLOWED_HOSTS ab (DisallowedHost -> HTTP 400 -> Probe
+              # scheitert -> Dauerneustart). Erlaubten Hostnamen mitschicken.
+              httpHeaders:
+                - name: Host
+                  value: paperless.pantheon.local
             periodSeconds: 10
             failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /accounts/login/
               port: 8000
+              httpHeaders:
+                - name: Host
+                  value: paperless.pantheon.local
             periodSeconds: 15
-          resources:
-            requests:
-              memory: 1Gi
-              cpu: 500m
-            limits:
-              memory: 4Gi
-              cpu: "4"
       volumes:
         - name: data
           persistentVolumeClaim:
