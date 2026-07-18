@@ -8,7 +8,7 @@ spec:
   accessModes: [ReadWriteMany]
   persistentVolumeReclaimPolicy: Retain
   storageClassName: ""
-  mountOptions: [nfsvers=4.1, hard]
+  mountOptions: [nfsvers=4, hard]
   nfs:
     server: 192.168.178.42
     path: /paperless-consume
