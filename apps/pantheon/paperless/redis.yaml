@@ -20,7 +20,7 @@ spec:
       containers:
         - name: redis
           # renovate: datasource=docker depName=redis
-          image: docker.io/library/redis:7.4-alpine
+          image: docker.io/library/redis:8.8-alpine
           args: ["--save", "", "--appendonly", "no"]
           ports:
             - containerPort: 6379
