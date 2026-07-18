@@ -17,6 +17,7 @@ spec:
     spec:
       securityContext:
         fsGroup: 1000
+      enableServiceLinks: false  
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -51,6 +52,8 @@ spec:
                   key: db-password
             - name: PAPERLESS_REDIS
               value: redis://paperless-redis:6379
+            - name: PAPERLESS_PORT
+              value: "8000"
             - name: PAPERLESS_SECRET_KEY
               valueFrom:
                 secretKeyRef:
