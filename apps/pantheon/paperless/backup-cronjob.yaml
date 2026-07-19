@@ -1,0 +1,74 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: paperless-backup
+  namespace: paperless
+spec:
+  schedule: "30 2 * * *"            # täglich 02:30
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            fsGroup: 1000
+          enableServiceLinks: false
+          # media/data sind RWO-iSCSI und vom Paperless-Pod gehalten -> der Backup-Pod
+          # MUSS auf dieselbe Node (RWO erlaubt mehrere Pods je Node, nicht je Cluster).
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app: paperless
+          containers:
+            - name: exporter
+              # renovate: datasource=docker depName=ghcr.io/paperless-ngx/paperless-ngx
+              image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15   # = Produktiv-Tag
+              # args (nicht command): der Image-Entrypoint (DB-Wait) läuft weiter,
+              # nur der Startprozess wird durch den Exporter ersetzt.
+              args:
+                - document_exporter
+                - /backup
+                - --no-progress-bar
+                - --delete              # spiegelt Löschungen -> Export wächst nicht unbegrenzt
+                - --compare-checksums   # robuste Änderungserkennung auf NFS
+                - --passphrase
+                - $(PAPERLESS_EXPORT_PASSPHRASE)
+              env:
+                - { name: PAPERLESS_PORT, value: "8000" }
+                - { name: PAPERLESS_DBENGINE, value: postgresql }
+                - { name: PAPERLESS_DBHOST, value: pantheon-pg-rw.databases.svc.cluster.local }
+                - { name: PAPERLESS_DBPORT, value: "5432" }
+                - { name: PAPERLESS_DBNAME, value: paperless }
+                - { name: PAPERLESS_DBUSER, value: paperless }
+                - name: PAPERLESS_DBPASS
+                  valueFrom:
+                    secretKeyRef:
+                      name: paperless-secret
+                      key: db-password
+                - name: PAPERLESS_EXPORT_PASSPHRASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: paperless-secret
+                      key: export-passphrase
+                - { name: PAPERLESS_REDIS, value: redis://paperless-redis:6379 }
+              volumeMounts:
+                - { name: media,  mountPath: /usr/src/paperless/media }
+                - { name: data,   mountPath: /usr/src/paperless/data }
+                - { name: backup, mountPath: /backup }
+              resources:
+                requests:
+                  memory: 256Mi
+                  cpu: 100m
+                limits:
+                  memory: 1Gi
+          volumes:
+            - { name: media,  persistentVolumeClaim: { claimName: paperless-media } }
+            - { name: data,   persistentVolumeClaim: { claimName: paperless-data } }
+            - { name: backup, persistentVolumeClaim: { claimName: paperless-backup } }
