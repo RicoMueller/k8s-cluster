@@ -99,7 +99,6 @@ spec:
             # MIGRATION: temporärer Import-Mount — in B.16 wieder entfernen.
             - name: migration
               mountPath: /tmp/import
-              readOnly: true
           startupProbe:
             httpGet:
               path: /accounts/login/
