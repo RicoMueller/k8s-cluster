@@ -11,3 +11,6 @@ resources:
   - httproute.yaml
   - backup-nfs.yaml
   - backup-cronjob.yaml
+  - paperless-offsite-ssh.yaml
+  - rclone-config.yaml
+  - offsite-sync-cronjob.yaml

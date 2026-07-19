@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: paperless-offsite-ssh
+    namespace: paperless
+type: Opaque
+stringData:
+    id_ed25519_hetzner: ENC[AES256_GCM,data:MXC4sk0f3pFiW9T+8V6lFVWr5ZV7AHCj0lq2sBypIsPT6Wv1gCTJC8jre6hWdxsSHA/lIxP3UHUwXJGf+K7i4a7UOqzI2CSIWGTWC+ce0ffz/uuoonRx/o7H8vS9yYFsNYDvY7cA/bo5M1jUodNxddTpkKqSvxoELjHOOeXGEpxejIbu443FVs1usR/Pap5F1OjGuNsJbMgI7cWVs9z5vttdzXXlVs6Q/qytqpwLjl5sWzTI4n4wBh7m0y1HaUuRu1AxKHm+Lphn1WmOGGSO4chbPj2MCHJnQWGDBEC86jJx0J2s5coQnBCJyoCoBGgQiNfS+SimwIxresMeZAkE33dGHbcRv4UFxOUrafSP+hcv4LTMxbhdsPM0DX00trRD0VXgwQq0AIjSbrrjvVjEZbnl2M2Gupmc8Zj/BHYszq53x6v6ur46YEPOThaPzPAlUAmDM40R/EM5X1bBRqv6s53OkU1oiXPnzYHiYyanLBRAV4vaJmsfD3BIx+l600lbLxGgVVB16q4bJl9SD2/AKYCHnn9GWFmaHlai,iv:Q947WlSl0DFE9t5EtbL7duw0rdVufBtXWcnnzFil2yA=,tag:owDefPm5ueAYxDBG6R0L/w==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBWdXZXLzRSZ3BQM3paaDYw
+            VFYxQXNEdE1ZelpzK1RGSXZsQ21Kdm1Falg0CmFUM29pN3RrbkF5M25saFhiSmdy
+            Y21SWmZVaXpmc2NnYTRjUVU5cGJtZkUKLS0tIHFOU1dNeVd5ZEp5TlNWem1PYUkz
+            eDlXWnVQbzNtYkVYT2ozS1BlOVRlQ1UKpHVF4XfvE6Pwu9NviHuHGXcy5eGLYBQK
+            C3eD3QZTjjUkiXFpxPH9kLdcRKltkTH/r+4CAZIFhJiHA3W0PYpwOA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1mcj4tr2sfgvc3h2ekqjsvm4s4gh0rs74nqnn0yapfzdtlgkqxysqj6wdrl
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-07-19T18:16:47Z"
+    mac: ENC[AES256_GCM,data:rgwbMI/wFW4fPD1Rzlb81vrebGN0YBADODTd1x1lSoHRZOYp0vriFiaVRmuOpAdSNcQ7y4L+b2reLBDIUn5tRPRFFO89I49/N6/7/QbaquHg++LVMIQIjr/teReBT2xoucSwp7cSuaY9WPorKIvmA8drzaBQACbAhEKZa0ghfts=,iv:URct4Y21wa+oyIZ0IPfewwfcsk98c2i7+r/qyC+EA74=,tag:wSUGq799hVBhbE6ROGxm9Q==,type:str]
+    version: 3.13.2

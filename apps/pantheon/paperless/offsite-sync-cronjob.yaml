@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: paperless-offsite-sync
+  namespace: paperless
+spec:
+  schedule: "0 3 * * *"            # täglich 03:00 — nach dem Export (02:30)
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          enableServiceLinks: false
+          securityContext:
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+            - name: rclone
+              # renovate: datasource=docker depName=rclone/rclone
+              image: rclone/rclone:1.71.0
+              imagePullPolicy: IfNotPresent
+              args:
+                - sync
+                - /backup          # lokales Export-Verzeichnis (RO gemountet)
+                - storagebox:      # Sub-User landet direkt im Zielverzeichnis
+                - --config=/config/rclone.conf
+                - --checkers=4     # < 8 wegen 10-Verbindungen-Limit der Box
+                - --sftp-set-modtime=false
+                - --stats=1m
+              volumeMounts:
+                - { name: backup, mountPath: /backup, readOnly: true }
+                - { name: rclone-config, mountPath: /config, readOnly: true }
+                - { name: ssh-key, mountPath: /keys, readOnly: true }
+              resources:
+                requests:
+                  memory: 128Mi
+                  cpu: 100m
+                limits:
+                  memory: 512Mi
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: paperless-backup
+            - name: rclone-config
+              configMap:
+                name: paperless-rclone-config
+            - name: ssh-key
+              secret:
+                secretName: paperless-offsite-ssh
+                defaultMode: 0400   # Key restriktiv, sonst lehnt SSH ab
