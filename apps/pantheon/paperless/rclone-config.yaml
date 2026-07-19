@@ -12,10 +12,9 @@ data:
     port = 23
     key_file = /keys/id_ed25519_hetzner
     shell_type = unix
-    # Host-Key vorab hinterlegt: verhindert, dass rclone ihn nach dem
-    # Verbindungsaufbau in die Config zurückschreiben will (scheitert am
-    # read-only ConfigMap-Mount -> "Failed to save config after 10 tries").
-    # Zusätzlich MITM-Schutz: rclone prüft die Identität der Gegenstelle.
+    # Host-Key vorab hinterlegt: verhindert den Config-Rückschreibversuch
+    # (scheitert am read-only ConfigMap-Mount) und schützt vor MITM.
     known_hosts_file = /config/known_hosts
   known_hosts: |
+    u620152.your-storagebox.de ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIICf9svRenC/PLKIL9nk6K/pxQgoiFC41wTNvoIncOxs
     [u620152.your-storagebox.de]:23 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIICf9svRenC/PLKIL9nk6K/pxQgoiFC41wTNvoIncOxs
