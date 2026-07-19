@@ -26,7 +26,7 @@ spec:
               args:
                 - sync
                 - /backup          # lokales Export-Verzeichnis (RO gemountet)
-                - storagebox:      # Sub-User landet direkt im Zielverzeichnis
+                - "storagebox:"      # Sub-User landet direkt im Zielverzeichnis
                 - --config=/config/rclone.conf
                 - --checkers=4     # < 8 wegen 10-Verbindungen-Limit der Box
                 - --sftp-set-modtime=false
