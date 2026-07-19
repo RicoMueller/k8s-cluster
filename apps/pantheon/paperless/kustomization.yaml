@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - consume-nfs.yaml
-  - migration-nfs.yaml      # MIGRATION: in B.16 wieder entfernen
   - pvc.yaml
   - paperless-secret.yaml
   - redis.yaml

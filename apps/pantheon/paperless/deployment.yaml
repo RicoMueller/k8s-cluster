@@ -96,9 +96,6 @@ spec:
               mountPath: /usr/src/paperless/consume
             - name: scratch
               mountPath: /scratch
-            # MIGRATION: temporärer Import-Mount — in B.16 wieder entfernen.
-            - name: migration
-              mountPath: /tmp/import
           startupProbe:
             httpGet:
               path: /accounts/login/
@@ -133,7 +130,3 @@ spec:
           emptyDir:
             medium: Memory
             sizeLimit: 1Gi
-        # MIGRATION: temporäres Import-Volume — in B.16 wieder entfernen.
-        - name: migration
-          persistentVolumeClaim:
-            claimName: paperless-migration
