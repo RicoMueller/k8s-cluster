@@ -76,7 +76,7 @@ spec:
             - name: PAPERLESS_URL
               value: https://paperless.rm-it.org
             - name: PAPERLESS_ALLOWED_HOSTS
-              value: paperless.rm-it.org,paperless.pantheon.local
+              value: paperless.rm-it.org,paperless.pantheon.local, paperless.paperless.svc.cluster.local
             - name: PAPERLESS_CSRF_TRUSTED_ORIGINS
               value: https://paperless.rm-it.org,http://paperless.pantheon.local
             - name: PAPERLESS_PROXY_SSL_HEADER
