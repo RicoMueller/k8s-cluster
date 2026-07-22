@@ -8,7 +8,7 @@ tridentOperator:
   # renovate: datasource=docker depName=qnapsystem/qnap-csi-operator
   image: qnapsystem/qnap-csi-operator:v1.6.1
   # renovate: datasource=docker depName=qnapsystem/qnap-csi-backend-qts-sidecar
-  cgiServerImage : qnapsystem/qnap-csi-backend-qts-sidecar:v1.6.1
+  cgiServerImage : qnapsystem/qnap-csi-backend-qts-sidecar:v1.6.2
   imagePullPolicy: IfNotPresent
   logLevel: debug
 
