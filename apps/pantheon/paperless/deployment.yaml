@@ -87,6 +87,10 @@ spec:
               value: "true"
             - name: PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS
               value: "true"
+            - name: PAPERLESS_CONSUMER_ENABLE_BARCODES
+              value: "true"
+            - name: PAPERLESS_CONSUMER_ENABLE_ASN_BARCODE
+              value: "true"
           volumeMounts:
             - name: data
               mountPath: /usr/src/paperless/data
