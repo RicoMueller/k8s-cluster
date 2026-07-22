@@ -42,11 +42,11 @@ data:
     - Services:
         - Paperless-ngx:
             icon: paperless-ngx.png
-            href: http://192.168.178.42:8010/
+            href: http://paperless.pantheon.local/
             description: Dokumentenmanagement
             widget:
               type: paperlessngx
-              url: http://192.168.178.42:8010
+              url: http://paperless.paperless.svc.cluster.local
               key: "{{HOMEPAGE_VAR_PAPERLESS_TOKEN}}"
     - Infrastruktur:
         - QNAP NAS:
