@@ -31,7 +31,7 @@ spec:
         - name: paperless
           # renovate: datasource=docker depName=ghcr.io/paperless-ngx/paperless-ngx
           # MIGRATION: zunächst exakt die Quellversion. Anhebung in Schritt B.16.
-          image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
+          image: ghcr.io/paperless-ngx/paperless-ngx:3.0.2
           ports:
             - containerPort: 8000
           env:
