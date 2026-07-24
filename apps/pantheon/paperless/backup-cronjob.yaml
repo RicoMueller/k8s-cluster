@@ -29,7 +29,7 @@ spec:
           containers:
             - name: exporter
               # renovate: datasource=docker depName=ghcr.io/paperless-ngx/paperless-ngx
-              image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15   # = Produktiv-Tag
+              image: ghcr.io/paperless-ngx/paperless-ngx:3.0.2   # = Produktiv-Tag
               # args (nicht command): der Image-Entrypoint (DB-Wait) läuft weiter,
               # nur der Startprozess wird durch den Exporter ersetzt.
               args:
