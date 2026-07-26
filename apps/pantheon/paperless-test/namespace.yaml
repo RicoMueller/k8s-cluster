@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: paperless-test
+  labels:
+    # PodSecurity wie Produktiv (siehe B.7): restricted erzwungen
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
