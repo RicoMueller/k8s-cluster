@@ -3,6 +3,9 @@ kind: Namespace
 metadata:
   name: paperless-test
   labels:
-    # PodSecurity wie Produktiv (siehe B.7): restricted erzwungen
-    pod-security.kubernetes.io/enforce: restricted
+    # baseline wie der Produktiv-Namespace (paperless). Das Paperless-Image
+    # startet via s6-overlay als root und dropt selbst — mit restricted
+    # scheitert der Init an /run. Gemeinsame restricted-Haertung beider
+    # Systeme ist als eigenes Vorhaben nach dem v3-Sprung geplant.
+    pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/enforce-version: latest
