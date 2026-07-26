@@ -16,6 +16,9 @@ spec:
         app: paperless
     spec:
       securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
         fsGroup: 1000
       # Stolperstein B (siehe B.10): Service-Link-Kollision mit PAPERLESS_PORT
       enableServiceLinks: false
