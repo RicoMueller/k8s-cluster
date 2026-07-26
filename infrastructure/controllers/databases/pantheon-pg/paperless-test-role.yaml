@@ -1,0 +1,13 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: paperless-test
+  namespace: databases
+spec:
+  cluster:
+    name: pantheon-pg
+  name: paperless_test
+  ensure: present
+  login: true
+  passwordSecret:
+    name: paperless-test-db-role

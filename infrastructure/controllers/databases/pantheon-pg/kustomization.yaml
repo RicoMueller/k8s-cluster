@@ -12,3 +12,6 @@ resources:
   - paperless-db-role-secret.yaml
   - paperless-role.yaml
   - paperless-database.yaml
+  - paperless-test-db-role-secret.yaml
+  - paperless-test-role.yaml
+  - paperless-test-database.yaml
