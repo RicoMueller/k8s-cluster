@@ -20,7 +20,7 @@ spec:
       containers:
         - name: redis
           # Testsystem: manuell gepinnt (versionsgleich Produktiv), KEINE Renovate-Annotation
-          image: docker.io/library/redis:8.8-alpine
+          image: docker.io/library/redis:8.10-alpine
           args: ["--save", "", "--appendonly", "no"]
           ports:
             - containerPort: 6379
