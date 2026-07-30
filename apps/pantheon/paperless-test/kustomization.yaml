@@ -5,6 +5,7 @@ resources:
   - namespace.yaml
   - paperless-test-secret.yaml
   - pvc.yaml
+  - backup-nfs-test.yaml
   - redis.yaml
   - deployment.yaml
   - service.yaml

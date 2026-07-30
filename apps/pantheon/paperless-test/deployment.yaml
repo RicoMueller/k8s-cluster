@@ -88,6 +88,9 @@ spec:
               mountPath: /usr/src/paperless/data
             - name: media
               mountPath: /usr/src/paperless/media
+            - name: backup
+              mountPath: /backup
+              readOnly: true
             - name: consume
               mountPath: /usr/src/paperless/consume
           # Stolperstein C (siehe B.10): Host-Header mitschicken, sonst lehnt
@@ -127,5 +130,9 @@ spec:
         - name: media
           persistentVolumeClaim:
             claimName: paperless-media
+        - name: backup
+          persistentVolumeClaim:
+            claimName: paperless-backup-ro
+            readOnly: true
         - name: consume
           emptyDir: {}

@@ -1,0 +1,31 @@
+# Read-only Mount der Produktiv-Backup-Freigabe ins Testsystem (Spiegel-Import, C.5.1.1).
+# Eigenes PV (clusterweit) + PVC im Namespace paperless-test — das Produktiv-PVC
+# lässt sich NICHT über Namespace-Grenzen teilen.
+# ZWEIFACHE readOnly-Absicherung: mountOptions [ro] hier + readOnly:true am volumeMount.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: paperless-backup-test-nfs
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes: [ReadOnlyMany]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions: [nfsvers=4, hard, ro]
+  nfs:
+    server: 192.168.178.42
+    path: /paperless-backup
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: paperless-backup-ro
+  namespace: paperless-test
+spec:
+  accessModes: [ReadOnlyMany]
+  storageClassName: ""
+  volumeName: paperless-backup-test-nfs
+  resources:
+    requests:
+      storage: 100Gi
