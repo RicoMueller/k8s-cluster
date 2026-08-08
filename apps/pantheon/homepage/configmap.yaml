@@ -110,6 +110,10 @@ data:
         - GitHub:
             - abbr: GH
               href: https://github.com/RicoMueller/k8s-cluster
+    - Test:
+        - Paperless-ngx:
+            - abbr: PP
+              href: http://paperless-test.pantheon.local/
   widgets.yaml: |
     - kubernetes:
         cluster:
