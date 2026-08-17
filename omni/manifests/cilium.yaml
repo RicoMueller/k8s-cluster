@@ -1961,7 +1961,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: certgen
-          image: "quay.io/cilium/certgen:v0.4.9@sha256:6213a4c54a1f36e14a9280765f058aaa2017550c28bc122f5b09ad146fd0da2b"
+          image: "quay.io/cilium/certgen:v0.4.10@sha256:d507ee2160af548e9811fff802f956ba40fd650cab509e02bf21778d383930b7"
           imagePullPolicy: IfNotPresent
           securityContext:
             capabilities:
@@ -2027,7 +2027,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: certgen
-              image: "quay.io/cilium/certgen:v0.4.9@sha256:6213a4c54a1f36e14a9280765f058aaa2017550c28bc122f5b09ad146fd0da2b"
+              image: "quay.io/cilium/certgen:v0.4.10@sha256:d507ee2160af548e9811fff802f956ba40fd650cab509e02bf21778d383930b7"
               imagePullPolicy: IfNotPresent
               securityContext:
                 capabilities:
