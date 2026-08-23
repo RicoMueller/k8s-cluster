@@ -8,5 +8,5 @@ metadata:
   name: pantheon-sync-canary
   namespace: default
 data:
-  last-change: "2026-08-23T19:00"
+  last-change: "2026-08-23T21:15"
   note: "Wert aendern, pushen, im Cluster nachsehen."
