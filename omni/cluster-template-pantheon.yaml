@@ -10,6 +10,9 @@ kubernetes:
     - name: cilium
       mode: full
       file: manifests/cilium.yaml
+    - name: sync-canary
+      mode: full
+      file: manifests/sync-canary.yaml
 talos:
   version: v1.12.7
 patches:

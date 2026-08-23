@@ -1,0 +1,12 @@
+# Handgepflegt (kein Helm-Render). Zweck: nachweisen, dass die Kette
+# Git -> Omni -> Cluster Aenderungen tatsaechlich zustellt.
+# Hintergrund: Manifest-Sync war 01.06.-23.08.2026 blockiert, ohne dass
+# Workflow, Template-Diff oder outofsync-Zaehler das angezeigt haben.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pantheon-sync-canary
+  namespace: default
+data:
+  last-change: "2026-08-23T19:00"
+  note: "Wert aendern, pushen, im Cluster nachsehen."
