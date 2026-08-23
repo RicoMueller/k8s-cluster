@@ -11,5 +11,13 @@
   },
   "ignorePaths": [
     "**/flux-system/gotk-components.yaml"
+  ],
+  "packageRules": [
+    {
+      "description": "omni/manifests/** sind gerenderte Helm-Ausgaben. Ein Tag-Bump ist dort kein gueltiges Upgrade, sondern ein Hinweis, dass neu gerendert werden muss. Ausserdem loest ein Merge einen unbeaufsichtigten Omni-Sync aus. Daher nur nach expliziter Freigabe im Dependency Dashboard.",
+      "matchFileNames": ["omni/manifests/**"],
+      "dependencyDashboardApproval": true,
+      "addLabels": ["omni-manifest", "needs-rerender"]
+    }
   ]
 }
