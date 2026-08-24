@@ -52,6 +52,11 @@ spec:
                     secretKeyRef:
                       name: paperless-secret
                       key: db-password
+                - name: PAPERLESS_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: paperless-secret
+                      key: secret-key
                 - name: PAPERLESS_EXPORT_PASSPHRASE
                   valueFrom:
                     secretKeyRef:
