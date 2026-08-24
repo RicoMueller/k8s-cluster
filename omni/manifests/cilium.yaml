@@ -200,6 +200,8 @@ data:
 
 
 
+  enable-host-firewall: "false"
+
   kube-proxy-replacement: "true"
   kube-proxy-replacement-healthz-bind-address: ""
   enable-no-service-endpoints-routable: "true"
@@ -390,6 +392,7 @@ rules:
   - cilium.io
   resources:
   - ciliumloadbalancerippools
+  - ciliumbgppeeringpolicies
   - ciliumbgpnodeconfigs
   - ciliumbgpadvertisements
   - ciliumbgppeerconfigs
@@ -670,6 +673,7 @@ rules:
   resources:
   - ciliumloadbalancerippools
   - ciliumpodippools
+  - ciliumbgppeeringpolicies
   - ciliumbgpclusterconfigs
   - ciliumbgpnodeconfigoverrides
   - ciliumbgppeerconfigs
@@ -1137,7 +1141,7 @@ spec:
     metadata:
       annotations:
         # ensure pods roll when configmap updates
-        cilium.io/cilium-configmap-checksum: "95fd3ec8ab17614fd70c52f544838e1a34136e1b5c494779003c7814c25eb5e0"
+        cilium.io/cilium-configmap-checksum: "decd3a53ffa7046a34f49de18058954fb4323e79fa78e8e166146ec4d2a58f31"
         kubectl.kubernetes.io/default-container: cilium-agent
       labels:
         k8s-app: cilium
@@ -1151,7 +1155,7 @@ spec:
           type: Unconfined
       containers:
       - name: cilium-agent
-        image: "quay.io/cilium/cilium:v1.19.3@sha256:2e61680593cddca8b6c055f6d4c849d87a26a1c91c7e3b8b56c7fb76ab7b7b10"
+        image: "quay.io/cilium/cilium:v1.19.7@sha256:1b58bcb81c723cf130a0dd2fb2e1132c57f8fbc2ef7bdb85519cfcc36111c77e"
         imagePullPolicy: IfNotPresent
         command:
         - cilium-agent
@@ -1330,7 +1334,7 @@ spec:
         
       initContainers:
       - name: config
-        image: "quay.io/cilium/cilium:v1.19.3@sha256:2e61680593cddca8b6c055f6d4c849d87a26a1c91c7e3b8b56c7fb76ab7b7b10"
+        image: "quay.io/cilium/cilium:v1.19.7@sha256:1b58bcb81c723cf130a0dd2fb2e1132c57f8fbc2ef7bdb85519cfcc36111c77e"
         imagePullPolicy: IfNotPresent
         command:
         - cilium-dbg
@@ -1361,7 +1365,7 @@ spec:
             drop:
               - ALL
       - name: apply-sysctl-overwrites
-        image: "quay.io/cilium/cilium:v1.19.3@sha256:2e61680593cddca8b6c055f6d4c849d87a26a1c91c7e3b8b56c7fb76ab7b7b10"
+        image: "quay.io/cilium/cilium:v1.19.7@sha256:1b58bcb81c723cf130a0dd2fb2e1132c57f8fbc2ef7bdb85519cfcc36111c77e"
         imagePullPolicy: IfNotPresent
         env:
         - name: BIN_PATH
@@ -1399,7 +1403,7 @@ spec:
       # from a privileged container because the mount propagation bidirectional
       # only works from privileged containers.
       - name: mount-bpf-fs
-        image: "quay.io/cilium/cilium:v1.19.3@sha256:2e61680593cddca8b6c055f6d4c849d87a26a1c91c7e3b8b56c7fb76ab7b7b10"
+        image: "quay.io/cilium/cilium:v1.19.7@sha256:1b58bcb81c723cf130a0dd2fb2e1132c57f8fbc2ef7bdb85519cfcc36111c77e"
         imagePullPolicy: IfNotPresent
         args:
         - 'mount | grep "/sys/fs/bpf type bpf" || mount -t bpf bpf /sys/fs/bpf'
@@ -1415,7 +1419,7 @@ spec:
           mountPath: /sys/fs/bpf
           mountPropagation: Bidirectional
       - name: clean-cilium-state
-        image: "quay.io/cilium/cilium:v1.19.3@sha256:2e61680593cddca8b6c055f6d4c849d87a26a1c91c7e3b8b56c7fb76ab7b7b10"
+        image: "quay.io/cilium/cilium:v1.19.7@sha256:1b58bcb81c723cf130a0dd2fb2e1132c57f8fbc2ef7bdb85519cfcc36111c77e"
         imagePullPolicy: IfNotPresent
         command:
         - /init-container.sh
@@ -1465,7 +1469,7 @@ spec:
           mountPath: /var/run/cilium # wait-for-kube-proxy
       # Install the CNI binaries in an InitContainer so we don't have a writable host mount in the agent
       - name: install-cni-binaries
-        image: "quay.io/cilium/cilium:v1.19.3@sha256:2e61680593cddca8b6c055f6d4c849d87a26a1c91c7e3b8b56c7fb76ab7b7b10"
+        image: "quay.io/cilium/cilium:v1.19.7@sha256:1b58bcb81c723cf130a0dd2fb2e1132c57f8fbc2ef7bdb85519cfcc36111c77e"
         imagePullPolicy: IfNotPresent
         command:
           - "/install-plugin.sh"
@@ -1654,7 +1658,7 @@ spec:
       
       containers:
       - name: cilium-envoy
-        image: "quay.io/cilium/cilium-envoy:v1.36.6-1776000132-2437d2edeaf4d9b56ef279bd0d71127440c067aa@sha256:ba0ab8adac082d50d525fd2c5ba096c8facea3a471561b7c61c7a5b9c2e0de0d"
+        image: "quay.io/cilium/cilium-envoy:v1.36.9-1786864149-07e8503ff34b9190d7bbe4e57d4e185c4ef8b1de@sha256:beccdf3c119f299cf696885188584bbd0531d74bca08096113207999aff95e87"
         imagePullPolicy: IfNotPresent
         command:
         - /usr/bin/cilium-envoy-starter
@@ -1840,7 +1844,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: cilium-operator
-        image: "quay.io/cilium/operator-generic:v1.19.3@sha256:205b09b0ed6accbf9fe688d312a9f0fcfc6a316fc081c23fbffb472af5dd62cd"
+        image: "quay.io/cilium/operator-generic:v1.19.7@sha256:61e773bfc25a448f1ad3ead605af94b3ef176ba2925cf4bd1b11e09794b72bed"
         imagePullPolicy: IfNotPresent
         command:
         - cilium-operator-generic
@@ -1944,7 +1948,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: hubble-generate-certs-a3297ae8da
+  name: hubble-generate-certs-8da6ad8283
   namespace: kube-system
   labels:
     k8s-app: hubble-generate-certs
@@ -1961,7 +1965,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: certgen
-          image: "quay.io/cilium/certgen:v0.4.1@sha256:f0c656830e856d26b24b0e144df1f8b327d3b46748d76a630514111fc365b697"
+          image: "quay.io/cilium/certgen:v0.4.9@sha256:6213a4c54a1f36e14a9280765f058aaa2017550c28bc122f5b09ad146fd0da2b"
           imagePullPolicy: IfNotPresent
           securityContext:
             capabilities:
@@ -2027,7 +2031,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: certgen
-              image: "quay.io/cilium/certgen:v0.4.1@sha256:f0c656830e856d26b24b0e144df1f8b327d3b46748d76a630514111fc365b697"
+              image: "quay.io/cilium/certgen:v0.4.9@sha256:6213a4c54a1f36e14a9280765f058aaa2017550c28bc122f5b09ad146fd0da2b"
               imagePullPolicy: IfNotPresent
               securityContext:
                 capabilities:
