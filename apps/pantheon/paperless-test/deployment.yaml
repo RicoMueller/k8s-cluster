@@ -28,7 +28,7 @@ spec:
           # Renovate-Annotation: Renovate haelt nur das Produktivsystem nach.
           # Beim Versionssprung wird dieser Tag von Hand angehoben (C.5.1.1) —
           # das Testsystem darf dem Produktivsystem vorauslaufen.
-          image: ghcr.io/paperless-ngx/paperless-ngx:3.1.1
+          image: ghcr.io/paperless-ngx/paperless-ngx:3.1.2
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
