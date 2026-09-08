@@ -18,6 +18,12 @@
       "matchFileNames": ["omni/manifests/**"],
       "dependencyDashboardApproval": true,
       "addLabels": ["omni-manifest", "needs-rerender"]
+    },
+    {
+      "description": "infrastructure/controllers/barman-plugin/** ist ein gevendortes Release-Manifest: Controller-Image, Sidecar-Image (Base64 in ConfigMap SIDECAR_IMAGE), CRDs, RBAC. Ein Tag-Bump hebt nur den Controller an und laesst das Sidecar zurueck (gemessen 08.09.2026). Der PR ist der Anlass zum Neu-Vendoren nach rezept-cnpg-backup B.7, kein Update zum Mergen.",
+      "matchFileNames": ["infrastructure/controllers/barman-plugin/**"],
+      "dependencyDashboardApproval": true,
+      "addLabels": ["barman-manifest", "needs-revendor"]
     }
   ]
 }
