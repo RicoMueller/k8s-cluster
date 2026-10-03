@@ -15,6 +15,9 @@ kubernetes:
       file: manifests/sync-canary.yaml
 talos:
   version: v1.12.7
+features:
+  backupConfiguration:
+    interval: 24h
 patches:
   - name: disable-cni
     file: patches/cni.yaml
