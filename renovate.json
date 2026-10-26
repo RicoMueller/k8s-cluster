@@ -24,6 +24,13 @@
       "matchFileNames": ["infrastructure/controllers/barman-plugin/**"],
       "dependencyDashboardApproval": true,
       "addLabels": ["barman-manifest", "needs-revendor"]
+    },
+    {
+      "description": "infrastructure/controllers/storage/qnap-iscsi/** enthaelt das gevendorte Trident-Chart (QNAP-CSI). Flux baut es nur neu, wenn sich version in Chart.yaml aendert (reconcileStrategy ChartVersion), ein Image-Bump allein wirkt nicht (Befund 20.10.2026). Die drei Images gehoeren zusammen. Daher ein gemeinsamer PR, nur nach Freigabe im Dependency Dashboard, und im PR zusaetzlich version und appVersion in Chart.yaml anheben.",
+      "matchFileNames": ["infrastructure/controllers/storage/qnap-iscsi/**"],
+      "groupName": "qnap-csi",
+      "dependencyDashboardApproval": true,
+      "addLabels": ["trident-chart", "needs-chart-bump"]
     }
   ]
 }
