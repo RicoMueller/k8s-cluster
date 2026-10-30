@@ -7,3 +7,7 @@ data:
   RENOVATE_AUTODISCOVER: "false"
   RENOVATE_GIT_AUTHOR: "Renovate Bot <bot@renovateapp.com>"
   RENOVATE_PLATFORM: "github"
+  # Erlaubt postUpgradeTasks aus renovate.json, aber nur die Render-Skripte
+  # unter hack/ (z.B. hack/render-metrics-server.sh). Die Befehle laufen mit
+  # dem Renovate-Token, daher die Regex bewusst eng halten.
+  RENOVATE_ALLOWED_COMMANDS: '["^bash hack/render-[a-z0-9-]+\\.sh$"]'
