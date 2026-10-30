@@ -31,6 +31,13 @@
       "groupName": "qnap-csi",
       "dependencyDashboardApproval": true,
       "addLabels": ["trident-chart", "needs-chart-bump"]
+    },
+    {
+      "description": "metrics-server: Patches sind reine Image-Tag-Bumps im per helm template gerenderten Manifest (keine CRDs, kein Chart-Re-Render noetig). Auf diesem Pfad laeuft kein CI-Check, daher ignoreTests. Minor- und Major-Updates bleiben manuell (Kompatibilitaetsmatrix gegen die Kubernetes-Version pruefen).",
+      "matchPackageNames": ["registry.k8s.io/metrics-server/metrics-server"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "ignoreTests": true
     }
   ]
 }
