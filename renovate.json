@@ -10,7 +10,18 @@
     ]
   },
   "ignorePaths": [
-    "**/flux-system/gotk-components.yaml"
+    "**/flux-system/gotk-components.yaml",
+    "infrastructure/controllers/metrics-server/metrics-server.yaml"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Gepinnte Versionen in hack/render-*.sh. Format: Kommentarzeile '# renovate: datasource=... depName=... [registryUrl=...]', direkt darunter VARIABLE=\"wert\".",
+      "managerFilePatterns": ["/^hack/render-[^/]+\\.sh$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: registryUrl=(?<registryUrl>\\S+))?\\n[A-Z_]+=\"(?<currentValue>[^\"]+)\""
+      ]
+    }
   ],
   "packageRules": [
     {
@@ -33,7 +44,18 @@
       "addLabels": ["trident-chart", "needs-chart-bump"]
     },
     {
-      "description": "metrics-server: Patches sind reine Image-Tag-Bumps im per helm template gerenderten Manifest (keine CRDs, kein Chart-Re-Render noetig). Auf diesem Pfad laeuft kein CI-Check, daher ignoreTests. Minor- und Major-Updates bleiben manuell (Kompatibilitaetsmatrix gegen die Kubernetes-Version pruefen).",
+      "description": "metrics-server: Chart-, Image- und Helm-Version stehen in hack/render-metrics-server.sh (das Manifest selbst ist in ignorePaths). Alle Updates landen in einem gemeinsamen PR; Renovate rendert danach das Manifest neu und committet es mit. Setzt allowedCommands in der Bot-Config voraus (infrastructure/controllers/renovate/configmap.yaml).",
+      "matchFileNames": ["hack/render-metrics-server.sh"],
+      "groupName": "metrics-server",
+      "postUpgradeTasks": {
+        "commands": ["bash hack/render-metrics-server.sh"],
+        "fileFilters": ["infrastructure/controllers/metrics-server/metrics-server.yaml"],
+        "executionMode": "branch"
+      }
+    },
+    {
+      "description": "metrics-server: Image-Patches automatisch mergen. Auf diesem Pfad laeuft kein CI-Check, daher ignoreTests. Chart- und Helm-Updates sowie Image-Minor/Major bleiben manuell (gerenderten Diff und Kompatibilitaetsmatrix gegen die Kubernetes-Version pruefen). Ein Gruppen-PR wird nur automatisch gemerged, wenn alle enthaltenen Updates automerge haben.",
+      "matchFileNames": ["hack/render-metrics-server.sh"],
       "matchPackageNames": ["registry.k8s.io/metrics-server/metrics-server"],
       "matchUpdateTypes": ["patch"],
       "automerge": true,
