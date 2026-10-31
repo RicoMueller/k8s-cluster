@@ -9,7 +9,7 @@
 set -euo pipefail
 
 # renovate: datasource=helm depName=metrics-server registryUrl=https://kubernetes-sigs.github.io/metrics-server/
-CHART_VERSION="3.13.0"
+CHART_VERSION="3.14.0"
 # renovate: datasource=docker depName=registry.k8s.io/metrics-server/metrics-server
 IMAGE_TAG="v0.9.1"
 # renovate: datasource=github-releases depName=helm/helm
