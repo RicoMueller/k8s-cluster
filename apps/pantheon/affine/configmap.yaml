@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: affine-config
+  namespace: affine
+data:
+  config.json: |
+    {
+      "server": {
+        "name": "Pantheon Whiteboard",
+        "externalUrl": "https://affine.rm-it.org"
+      },
+      "auth": {
+        "allowSignup": false,
+        "requireEmailVerification": false
+      },
+      "copilot": {
+        "enabled": false
+      }
+    }
