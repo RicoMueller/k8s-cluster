@@ -54,6 +54,24 @@ data:
               type: paperlessngx
               url: http://paperless.paperless.svc.cluster.local
               key: "{{HOMEPAGE_VAR_PAPERLESS_TOKEN}}"
+        # Homepage v2.7.0 hat kein AFFiNE-Widget -> customapi auf /info.
+        # /info ist öffentlich (kein Token nötig). Clusterinterne Adresse, weil von
+        # außen Cloudflare Access mit 302 antwortet und die Kachel sonst auch bei
+        # ausgefallenem AFFiNE grün wäre.
+        - AFFiNE:
+            icon: affine.png
+            href: https://affine.rm-it.org/
+            description: Whiteboard
+            siteMonitor: http://affine.affine.svc.cluster.local/info
+            widget:
+              type: customapi
+              url: http://affine.affine.svc.cluster.local/info
+              refreshInterval: 60000
+              mappings:
+                - field: compatibility
+                  label: Version
+                - field: type
+                  label: Typ
     - Infrastruktur:
         - QNAP NAS:
             icon: qnap.png
@@ -116,6 +134,12 @@ data:
         - GitHub:
             - abbr: GH
               href: https://github.com/RicoMueller/k8s-cluster
+        - Cloudflare Dashboard:
+            - abbr: CF
+              href: https://dash.cloudflare.com/
+        - Hetzner Console:
+            - abbr: HZ
+              href: https://console.hetzner.com
     - Test:
         - Paperless-ngx:
             - abbr: PP
