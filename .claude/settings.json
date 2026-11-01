@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git pull --rebase)",
+      "Bash(git show *)",
+      "Bash(kubectl get *)",
+      "Bash(kubectl describe *)",
+      "Bash(kubectl logs *)",
+      "Bash(kubectl kustomize *)",
+      "Bash(kubectl rollout status *)",
+      "Bash(kubectl cnpg status *)",
+      "Bash(flux get *)",
+      "Bash(flux reconcile *)",
+      "Bash(python3 -m json.tool *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(kubectl run *)",
+      "Bash(kubectl exec *)",
+      "Bash(kubectl create *)",
+      "Bash(kubectl scale *)",
+      "Bash(kubectl rollout restart *)",
+      "Bash(kubectl rollout undo *)",
+      "Bash(kubectl cnpg psql *)",
+      "Bash(kubectl cnpg backup *)",
+      "Bash(kubectl cnpg restart *)",
+      "Bash(flux suspend *)",
+      "Bash(flux resume *)",
+      "Bash(omnictl *)",
+      "Bash(talosctl *)"
+    ],
+    "deny": [
+      "Bash(sops *)",
+      "Bash(kubectl get secret*)",
+      "Bash(kubectl -n * get secret*)",
+      "Bash(kubectl get * secret*)",
+      "Bash(kubectl apply *)",
+      "Bash(kubectl delete *)",
+      "Bash(kubectl edit *)",
+      "Bash(kubectl patch *)",
+      "Bash(kubectl replace *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(cloudflared *)",
+      "Read(./tls.key)",
+      "Read(~/.config/sops/**)",
+      "Read(~/Library/Application Support/sops/**)",
+      "Read(~/.kube/**)",
+      "Read(~/.talos/**)",
+      "Read(~/.cloudflared/**)",
+      "Read(~/.ssh/**)"
+    ]
+  }
+}
