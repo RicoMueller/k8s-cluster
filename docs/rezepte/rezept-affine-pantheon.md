@@ -4,9 +4,9 @@
 >
 > Bewusst schlank: Alles, was die Nutzung verhindern oder stark einschränken würde, ist drin. Komfort- und Härtungsthemen stehen gesammelt unter **„Bewusst zurückgestellt"** — jeweils mit dem Risiko, das man bis dahin trägt.
 
-*Rezeptversion: 1.1.2 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
+*Rezeptversion: 1.2 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
 
-> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B und C am 01.11.2026 mit dem Rollout live verifiziert, Teil D am 01.11.2026, Teil E teilweise (E.1–E.3 und Einladungslink am 01.11.2026; E.4/E.5 offen). Teil F noch nicht live verifiziert. Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
+> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B und C am 01.11.2026 mit dem Rollout live verifiziert, Teil D am 01.11.2026, Teil E teilweise (E.1–E.3 und Einladungslink am 01.11.2026; E.4/E.5 offen). Teil F am 01.11.2026 live verifiziert (erster Renovate-Pull-Request für AFFiNE steht noch aus). Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
 
 > **Umsetzung mit Claude Code.** Dieses Rezept ist so geschrieben, dass Claude Code (VS Code, Repo `~/k8s-cluster`, Leitplanken in `CLAUDE.md` und `.claude/settings.json`) alle Manifeste anlegt, prüft und committet. Rico greift nur an den mit **[Rico]** markierten Stellen ein: Secrets erzeugen und verschlüsseln, `git push` freigeben, Weboberflächen (Omni-Anmeldung, Cloudflare, AFFiNE-Admin). Alles mit **[Claude Code]** markierte erledigt Claude Code selbständig.
 
@@ -51,7 +51,7 @@ Acht Abende à etwa 30 Minuten. Nach jedem Abend kann man aufhören: Die Manifes
 | 5 ✅ 01.11. | Flux-Kustomization `apps-affine`, Rollout, Migrationslog, `/info` | Teil C | Push freigeben, ggf. Omni-Anmeldung | Datei anlegen, Commit, Verifikation | AFFiNE läuft intern |
 | 6 ✅ 01.11. | Access-Application, DNS-Eintrag, Admin-Konto — **ohne Pause dazwischen** | Teil D | Cloudflare-Dashboard, `cloudflared`-CLI, Admin anlegen | Gegenproben | extern erreichbar |
 | 7 ◐ teilweise | Partner-Konto, Workspace, Live-Test — E.1–E.3 ✅ 01.11., Einladungssperre per Variante B behoben (Stolperstein 9); **E.4/E.5 offen**, nachholen nach Ricos Dienstreise | Teil E | AFFiNE-Admin, Access-Policy, Test | Datenbank-Gegenprobe | Partner arbeitet mit |
-| 8 ← nächster Schritt | Backup-Nachweis, Update-Regeln, Rezept fortschreiben | Teil F | On-Demand-Backup freigeben | Verifikation, Rezeptversion 1.2 | — |
+| 8 ✅ 01.11. | Backup-Nachweis, Update-Regeln, Rezept fortschreiben | Teil F | On-Demand-Backup freigeben | Verifikation, Rezeptversion 1.2 | — |
 
 **Gesamtaufwand:** ≈ 3 h reine Arbeitszeit.
 
@@ -1034,7 +1034,7 @@ Beide Wege funktionieren ohne Mailversand. Free-Self-Hosting erlaubt bis zu 10 M
 
 ---
 
-# Teil F — Betrieb: Backup und Updates (Abend 8) *[Claude Code; Backup-Auslösung: Rico gibt frei]*
+# Teil F — Betrieb: Backup und Updates (Abend 8) *[Claude Code; Backup-Auslösung: Rico im eigenen Terminal]* — ✅ 01.11.2026
 
 ## F.1 — Was ist wo gesichert?
 
@@ -1043,18 +1043,34 @@ Beide Wege funktionieren ohne Mailversand. Free-Self-Hosting erlaubt bis zu 10 M
 | Whiteboards, Dokumente, Konten, Workspaces, Admin-Panel-Settings | DB `affine` in `pantheon-pg` | Barman Plugin: WAL-Archiving + tägliches Base-Backup → Hetzner Object Storage | ✅ automatisch ab Teil A |
 | `config.json` | ConfigMap | Git | ✅ |
 | `private.key`, DB-Passwort | SOPS-Secrets | Git (verschlüsselt) | ✅ |
-| Bilder, Anhänge, Avatare | PVC `affine-storage` (QNAP-iSCSI) | nur lokal auf der QNAP | ⚠️ zurückgestellt (Punkt 1) |
+| Bilder, Anhänge, Avatare | PVC `affine-storage` (QNAP-iSCSI, PV mit `reclaimPolicy: Delete`) | nur lokal auf der QNAP | ⚠️ zurückgestellt (Punkte 1 und 11) |
 
 **Verifikation — die neue Datenbank ist im Backup:** Ein On-Demand-Base-Backup des Shared-Clusters auslösen (wie `rezept-cnpg-backup-pantheon.md`, Teil E):
 
 ```bash
+# 1) Claude Code: Ausgangslage
 kubectl cnpg status pantheon-pg -n databases | grep -A6 "Continuous Backup"
 # Erwartung: Working WAL archiving: OK
+kubectl get database affine -n databases -o jsonpath='{.metadata.creationTimestamp}{"\n"}'
+# Liegt "Last Successful Backup" vor diesem Zeitpunkt, ist affine bisher nur per WAL gesichert.
+```
+
+```bash
+# 2) Rico im eigenen Terminal (legt direkt ein Backup-Objekt an -> Harte Regel 1)
 kubectl cnpg backup pantheon-pg -n databases \
   --method plugin --plugin-name barman-cloud.cloudnative-pg.io
-kubectl get backup -n databases --sort-by=.metadata.creationTimestamp | tail -2
-# Erwartung: neuestes Backup "completed"
+# Ausgabe: backup/pantheon-pg-JJJJMMTTHHMMSS created  -> Namen an Claude Code geben
 ```
+
+```bash
+# 3) Claude Code: B auf den gemeldeten Namen setzen, begrenzt warten
+B=pantheon-pg-20261101181813
+kubectl wait backup/$B -n databases --for=jsonpath='{.status.phase}'=completed --timeout=15m
+kubectl get backup $B -n databases -o jsonpath='{.status.phase} {.status.startedAt} {.status.error}{"\n"}'
+# Erwartung: completed, Start nach der Anlage der Datenbank affine, kein Fehler
+```
+
+> **Ergebnis 01.11.2026:** Vorher `Working WAL archiving: OK`, 0 WALs wartend; letztes Base-Backup 03:00 Uhr — **vor** der Anlage von `affine` (16:42 Uhr), also bis dahin nur WAL-gesichert. On-Demand-Backup `pantheon-pg-20261101181813`: `completed`, Methode `plugin`, 18:18:14–18:18:25 Uhr, kein Fehler; `cnpg status` danach `Last Successful Backup: 2026-11-01 18:18:25 CET`.
 
 > Ein Barman-Base-Backup ist **physisch** und umfasst den ganzen Cluster — die Datenbank `affine` ist damit enthalten, ohne dass irgendetwas pro App konfiguriert werden muss. Das ist der Kern von ADR 1.
 
@@ -1081,12 +1097,14 @@ kubectl get backup -n databases --sort-by=.metadata.creationTimestamp | tail -2
 > **Renovate und AFFiNE-Tags:** Neben `0.27.4` existieren `0.27.5-beta.1`, `2026.10.x-canary.NNN`, `stable-<hash>` und `candidate-<lauf>-<versuch>`. Die Regel aus B.9 lässt nur `X.Y.Z` zu. Den **ersten** AFFiNE-PR trotzdem bewusst ansehen: Er muss auf eine reine `X.Y.Z`-Version zeigen und **beide** `image:`-Zeilen im Deployment anheben.
 
 **Rückweg bei misslungener Migration (nur beschrieben, im Notfall anwenden):**
-1. `kubectl scale deploy/affine -n affine --replicas=0` (verhindert weitere Schreibvorgänge).
+1. **[Rico]** `kubectl scale deploy/affine -n affine --replicas=0` (verhindert weitere Schreibvorgänge; direkte Cluster-Änderung → Harte Regel 1, daher Rico im eigenen Terminal).
 2. Restore-Cluster aus Barman in einen Wegwerf-Namespace (`rezept-cnpg-backup-pantheon.md`, Teil F), Zielzeitpunkt vor dem Merge (PITR).
 3. Aus dem Restore-Cluster `pg_dump -Fc -d affine`, in `pantheon-pg` Datenbank `affine` leeren und per `pg_restore` einspielen.
 4. Image-Tag per Git-Revert auf die alte Version, reconcilen, hochskalieren.
 
 > Der Weg über den Restore-Cluster ist nötig, weil ein PITR-Restore direkt am Shared-Cluster **alle** Apps zurücksetzen würde.
+
+> **Ergebnis 01.11.2026:** Renovate (CronJob `renovate`, stündlich, Version 44.199.0) lief nach dem Commit von `deployment.yaml` fehlerfrei (`exitCode 0`), es gibt keine Branches für AFFiNE oder Redis. Passt: Neuestes AFFiNE-Release ist `v0.27.4`, Redis steht auf dem Paperless-Stand `8.10-alpine`. Der **erste** AFFiNE-Pull-Request steht damit noch aus und wird beim Eintreffen nach der Tabelle oben geprüft (Definition of Done 14). Nebenbefund außerhalb von AFFiNE: `Workflows update rejection - aborting branch` für `renovate/actions-checkout-7.x` — vermutlich fehlt dem Token das `workflow`-Recht; eigenes Vorhaben.
 
 ---
 
@@ -1114,8 +1132,8 @@ kubectl get backup -n databases --sort-by=.metadata.creationTimestamp | tail -2
 | 10 | Registrierung geschlossen | Gegenprobe D.4 |
 | 11 | Partner kann mitarbeiten | Konto importiert, in Access freigeschaltet, Workspace-Mitglied (E.1–E.4) — **offen** (E.1–E.3 ✅ 01.11.; Einladung annehmen E.4 nach Ricos Dienstreise) |
 | 12 | Live-Kollaboration | E.5 grün, WebSocket `101` — **offen** (nach Ricos Dienstreise) |
-| 13 | DB im Backup verifiziert | On-Demand-Backup `completed` nach Anlage der DB (F.1) |
-| 14 | Update-Weg definiert | F.2, erster Renovate-PR bewusst geprüft |
+| 13 | DB im Backup verifiziert | On-Demand-Backup `completed` nach Anlage der DB (F.1) — ✅ 01.11. (`pantheon-pg-20261101181813`) |
+| 14 | Update-Weg definiert | F.2, erster Renovate-PR bewusst geprüft — **offen**: Weg definiert, Renovate läuft; erster AFFiNE-Pull-Request steht noch aus |
 
 ---
 
@@ -1133,10 +1151,17 @@ Jeder Punkt mit dem Risiko, das bis zur Umsetzung besteht. Reihenfolge = empfohl
 8. **OIDC über Keycloak**, sobald der OpenCloud-Stack steht (AFFiNE unterstützt OIDC im Admin-Panel).
 9. **Homepage-Kachel** (Block B).
 10. **Einladungssperre für neue Konten wieder aktivieren, sobald mehr als zwei Personen AFFiNE nutzen.** *Risiko:* Mit `auth.newAccountShareActionDelay: 0` (B.3, Stolperstein 9) kann jedes Konto ab der ersten Minute Einladungs- und Share-Links erzeugen. Hinter Access mit OTP, bei geschlossener Registrierung und zwei bekannten Personen vertretbar. *Auslöser:* mehr als zwei Personen, Registrierung geöffnet oder Access-Gate entfernt → Eintrag entfernen (Default `86400` s) oder passenden Wert setzen.
+11. **Blob-PVC gegen Löschen absichern (gemeinsam mit Paperless).** *Risiko:* Das PV von `affine-storage` hat `reclaimPolicy: Delete` (StorageClass `qnap-iscsi`), `apps-affine` läuft mit `prune: true`. Fliegt `pvc.yaml` aus der `kustomization.yaml` oder wird `apps-affine` bzw. der Namespace entfernt, löscht Flux die PVC — Bilder und Anhänge wären weg (Whiteboards, Konten und Workspaces liegen in der DB und sind gesichert). Paperless hat dieselbe Lage. *Bewertung:* Die Flux-Annotation `kustomize.toolkit.fluxcd.io/prune: disabled` an der PVC schützt nur vor dem ersten Fall, nicht vor dem Löschen des Namespace; `Retain` ginge nur per direktem Patch am PV oder über eine eigene StorageClass (Shared-Infrastruktur). *Umsetzung später:* als eigenes Vorhaben für beide Apps, zusammen mit Punkt 1. Entscheidung Rico 01.11.2026.
 
 ---
 
 ## Rezept-Changelog
+
+**1.2 (01.11.2026)** — Erkenntnisse aus Abend 8 (Teil F live). Damit sind alle acht Abende durchlaufen; offen sind nur E.4/E.5 (nach Ricos Dienstreise) und der erste AFFiNE-Pull-Request von Renovate.
+- **F.1 aufgeteilt nach Rollen:** Ausgangslage und Warten mit `kubectl wait … --timeout=15m` durch Claude Code, `kubectl cnpg backup` durch Rico im eigenen Terminal (legt direkt ein Objekt an → Harte Regel 1). Neue Prüfung: Liegt das letzte Base-Backup vor der Anlage der Datenbank, ist sie bis dahin nur WAL-gesichert. Ergebnis eingetragen (`pantheon-pg-20261101181813` `completed`).
+- **F.2 Rückweg:** `kubectl scale` als [Rico] markiert (Harte Regel 1). Renovate-Lauf und Stand der Versionen eingetragen; Nebenbefund Workflow-Recht des Renovate-Tokens notiert.
+- **„Bewusst zurückgestellt", Punkt 11 (neu):** Blob-PVC mit `reclaimPolicy: Delete` und `prune: true` — Risiko, Bewertung der Optionen, Lösung gemeinsam mit Paperless als eigenes Vorhaben (Entscheidung Rico).
+- **Definition of Done:** 13 ✅; 14 offen bis zum ersten AFFiNE-Pull-Request; 11 und 12 weiter offen (E.4/E.5).
 
 **1.1.2 (01.11.2026)** — Erkenntnisse aus Abend 7 (Teil E teilweise).
 - **Stolperstein 9 (neu, E.4):** AFFiNE 0.27.4 sperrt Einladungen für Konten jünger als 24 h (`auth.newAccountShareActionDelay`, Default `86400` s). Einladungslink: „This feature is temporarily unavailable for you."; E-Mail-Invite ohne SMTP: Endlos-Animation (`InviteQuotaAssertService`, `quota_subject`). Befund, Gegenprobe im Image und Lösung eingetragen.
