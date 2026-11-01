@@ -4,9 +4,9 @@
 >
 > Bewusst schlank: Alles, was die Nutzung verhindern oder stark einschränken würde, ist drin. Komfort- und Härtungsthemen stehen gesammelt unter **„Bewusst zurückgestellt"** — jeweils mit dem Risiko, das man bis dahin trägt.
 
-*Rezeptversion: 1.1 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
+*Rezeptversion: 1.1.1 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
 
-> **Status:** Teil 0 am 27.10.2026 live verifiziert (Ergebnisse in Teil 0 eingetragen). Teile A–F noch nicht live verifiziert. Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
+> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B–F noch nicht live verifiziert. Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
 
 > **Umsetzung mit Claude Code.** Dieses Rezept ist so geschrieben, dass Claude Code (VS Code, Repo `~/k8s-cluster`, Leitplanken in `CLAUDE.md` und `.claude/settings.json`) alle Manifeste anlegt, prüft und committet. Rico greift nur an den mit **[Rico]** markierten Stellen ein: Secrets erzeugen und verschlüsseln, `git push` freigeben, Weboberflächen (Omni-Anmeldung, Cloudflare, AFFiNE-Admin). Alles mit **[Claude Code]** markierte erledigt Claude Code selbständig.
 
@@ -45,7 +45,7 @@ Acht Abende à etwa 30 Minuten. Nach jedem Abend kann man aufhören: Die Manifes
 | Abend | Inhalt | Rezept | Rico | Claude Code | Wirkung im Cluster |
 |---|---|---|---|---|---|
 | 1 ✅ 27.10. | Vorab-Checks | Teil 0 | Befehle ausgeführt | — | keine |
-| 2 | Beide Secrets, Datenbank-Rolle, Datenbank mit pgvector | A.1–A.3 | A.1 im eigenen Terminal, Push freigeben | A.2, A.3, Commit, Verifikation | Rolle + Datenbank live |
+| 2 ✅ 01.11. | Beide Secrets, Datenbank-Rolle, Datenbank mit pgvector | A.1–A.3 | A.1 im eigenen Terminal, Push freigeben | A.2, A.3, Commit, Verifikation | Rolle + Datenbank live |
 | 3 | Namespace, Konfiguration, Speicher, Redis | B.1, B.3–B.5 | Push freigeben | Manifeste, Build-Check, Commit | keine |
 | 4 | Deployment, Service, Route, lokale Kustomization, Renovate-Regel | B.6–B.9 | Push freigeben | Manifeste, Build-Check, Commit | keine |
 | 5 | Flux-Kustomization `apps-affine`, Rollout, Migrationslog, `/info` | Teil C | Push freigeben, ggf. Omni-Anmeldung | Datei anlegen, Commit, Verifikation | AFFiNE läuft intern |
@@ -244,74 +244,35 @@ ls clusters/pantheon/
 
 ---
 
-# Teil A — Secrets und Datenbank (Abend 2, 30 Min)
+# Teil A — Secrets und Datenbank (Abend 2, 30 Min) — ✅ 01.11.2026
 
 > Gleiches Muster wie Paperless B.3: Rolle, Datenbank und Passwort-Secret als CNPG-CRDs im Verzeichnis von `pantheon-pg`. Neu ist der `extensions`-Block.
 >
-> **Änderung ggü. 1.0:** Beide Secrets (Rolle in `databases`, App in `affine`) entstehen jetzt in **einem** Befehlsblock (A.1). In 1.0 hing B.2 an einer Shell-Variable aus A.1, die eine ganze Sitzung von A bis B überleben musste — mit 30-Minuten-Abenden nicht machbar.
+> **Änderung ggü. 1.0:** Beide Secrets (Rolle in `databases`, App in `affine`) entstehen jetzt in **einem** Lauf (A.1, seit 1.1.1 als lokales Skript). In 1.0 hing B.2 an einer Shell-Variable aus A.1, die eine ganze Sitzung von A bis B überleben musste — mit 30-Minuten-Abenden nicht machbar.
 
 ## A.1 — Beide Secrets erzeugen und verschlüsseln *[Rico, im eigenen Terminal]*
 
-Diesen Block **nicht** von Claude Code ausführen lassen. Er erzeugt Passwort und Server-Schlüssel, schreibt beide Secrets und verschlüsselt sie, bevor irgendetwas davon in einer Claude-Sitzung sichtbar wird. Die Klartexte existieren nur in Variablen und einer temporären Datei, die am Ende gelöscht werden.
+Dieses Skript **nicht** von Claude Code ausführen lassen. Es erzeugt Passwort und Server-Schlüssel, schreibt beide Secrets und verschlüsselt sie, bevor irgendetwas davon in einer Claude-Sitzung sichtbar wird. Die Klartexte existieren nur in einer Variable und einer temporären Datei, die am Ende gelöscht werden.
 
 ```bash
-cd ~/k8s-cluster
-D=infrastructure/controllers/databases/pantheon-pg
-A=apps/pantheon/affine
-mkdir -p "$A"
-
-AFFINE_DBPW=$(openssl rand -hex 24)
-KEY=$(mktemp)
-openssl ecparam -name prime256v1 -genkey -noout -out "$KEY"
-
-# 1) Passwort der Datenbank-Rolle (Namespace databases)
-cat > "$D/affine-db-role-secret.yaml" <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: affine-db-role
-  namespace: databases
-type: kubernetes.io/basic-auth
-stringData:
-  username: affine
-  password: ${AFFINE_DBPW}
-EOF
-
-# 2) App-Secret (Namespace affine): dasselbe Passwort + Server-Schlüssel
-{
-  cat <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: affine-secret
-  namespace: affine
-type: Opaque
-stringData:
-  db-password: ${AFFINE_DBPW}
-  private.key: |
-EOF
-  sed 's/^/    /' "$KEY"
-} > "$A/affine-secret.yaml"
-
-sops --encrypt --in-place "$D/affine-db-role-secret.yaml"
-sops --encrypt --in-place "$A/affine-secret.yaml"
-
-rm -f "$KEY"
-unset AFFINE_DBPW KEY
-
-grep -c 'ENC\[' "$D/affine-db-role-secret.yaml" "$A/affine-secret.yaml"
-# Erwartung: je Datei eine Zahl >= 3 (zwei Werte + MAC)
+bash ~/k8s-cluster/wartung/scripts/affine-a1-secrets.sh
+# Erwartung am Ende: ENC-Zähler je Datei >= 3, Klartext-Prüfung "OK", "FERTIG."
 ```
+
+Das Skript liegt **bewusst nur lokal** (`wartung/scripts/` ist über `.git/info/exclude` ausgeschlossen) und gehört nicht ins Repository. Es schreibt `infrastructure/controllers/databases/pantheon-pg/affine-db-role-secret.yaml` (Namespace `databases`) und `apps/pantheon/affine/affine-secret.yaml` (Namespace `affine`, Schlüssel `db-password` und `private.key`) und
+- bricht beim ersten Fehler ab und prüft vorab `openssl`, `sops`, `.sops.yaml` und das Zielverzeichnis,
+- überschreibt nichts: Existiert eine der beiden Dateien schon, bricht es ab (für einen Neulauf beide Dateien vorher entfernen),
+- entfernt bei einem Abbruch unverschlüsselte Dateien wieder (`trap`) und gibt weder Passwort noch Schlüssel aus.
 
 Danach in Claude Code: „Secrets für AFFiNE liegen bereit, weiter mit A.2."
 
 > **⚠️ Stolperstein 1 — Passwort muss URL-sicher sein.** AFFiNE liest die Datenbank ausschließlich aus `DATABASE_URL` (`postgresql://user:passwort@host/db`). Das Paperless-übliche `openssl rand -base64` erzeugt `/`, `+` und `=` — diese Zeichen zerbrechen die URL, und die Migration scheitert mit einem irreführenden Verbindungsfehler. `-hex` liefert nur `0-9a-f`.
 
-> **Warum ein Block für beide Secrets?** Das Passwort wird zweimal gebraucht (Rolle in `databases`, App in `affine`), weil Secrets namespace-gebunden sind. Aus derselben Variable im selben Block erzeugt, können die beiden Stellen nicht auseinanderlaufen.
+> **Warum ein Skript für beide Secrets?** Das Passwort wird zweimal gebraucht (Rolle in `databases`, App in `affine`), weil Secrets namespace-gebunden sind. Aus derselben Variable im selben Lauf erzeugt, können die beiden Stellen nicht auseinanderlaufen.
 
 > **Wo liegen Passwort und Schlüssel danach?** Nur noch SOPS-verschlüsselt im Repo — Git ist ihre Sicherung, wie bei allen Pantheon-Secrets. Bei Bedarf liest Rico sie mit `sops -d` aus. Der Schlüssel hat dasselbe Format, das AFFiNEs eigenes Skript erzeugen würde (SEC1-PEM auf `prime256v1`, siehe ADR 3); `-----BEGIN EC PRIVATE KEY-----` steht vor der Verschlüsselung in der ersten Zeile.
 
-> **Was der Befehlsblock bewusst nicht tut:** committen. Den Commit macht Claude Code in A.3 zusammen mit Rolle und Datenbank — so landen Secret und Verbraucher im selben Commit.
+> **Was das Skript bewusst nicht tut:** committen. Den Commit macht Claude Code in A.3 zusammen mit Rolle und Datenbank — so landen Secret und Verbraucher im selben Commit.
 
 ## A.2 — Rolle und Datenbank *[Claude Code]*
 
@@ -397,6 +358,15 @@ kubectl cnpg psql pantheon-pg -n databases -- -d affine -tAc \
 ```
 
 > `apps/pantheon/affine/affine-secret.yaml` liegt ab jetzt im Repo, ist aber **inaktiv**: Noch liest keine Flux-Kustomization `apps/pantheon/affine/` (Schalter erst in C.1).
+
+> **Ergebnis 01.11.2026:** Commit `94e9f99`, Flux `infrastructure-databases-cluster` Ready auf dieser Revision. DatabaseRole und Database `affine` nach knapp einer Minute `applied: true`; in PostgreSQL Rolle `affine` (Login ja, Superuser nein), Datenbank `affine` mit Owner `affine`, `vector|0.8.6`.
+>
+> **Erwartbare Übergangsmeldung (Wettlauf beim RBAC):** Direkt nach dem Reconcile zeigte die DatabaseRole `secrets "affine-db-role" is forbidden: User "system:serviceaccount:databases:pantheon-pg" cannot get resource "secrets"`, und die Database folgerichtig `role "affine" does not exist`. Ursache: Der Instanzmanager las das Secret, bevor der Operator es in die Role `pantheon-pg` (`resourceNames`) eingetragen hatte. Selbstheilend — nicht eingreifen, sondern begrenzt warten:
+> ```bash
+> kubectl wait databaserole/affine -n databases --for=jsonpath='{.status.applied}'=true --timeout=180s
+> kubectl wait database/affine -n databases --for=jsonpath='{.status.applied}'=true --timeout=180s
+> ```
+> Erst wenn das nach drei Minuten noch scheitert: `kubectl get role pantheon-pg -n databases -o yaml | grep affine-db-role` — fehlt der Eintrag, anhalten.
 
 > **⚠️ Stolperstein 2 — Signatur einer fehlenden Extension.** Steht im Migrationslog später `permission denied to create extension "vector"`, hat CNPG die Extension nicht angelegt (Datenbank-CR prüfen: `kubectl describe database affine -n databases`, Feld `status.message`). Nicht dem User `affine` Superuser-Rechte geben — die Extension gehört in die CR.
 
@@ -1104,6 +1074,10 @@ Jeder Punkt mit dem Risiko, das bis zur Umsetzung besteht. Reihenfolge = empfohl
 ---
 
 ## Rezept-Changelog
+
+**1.1.1 (01.11.2026)** — Erkenntnisse aus Abend 2 (Teil A live).
+- **A.1 als lokales Skript:** Statt des eingefügten Befehlsblocks verweist A.1 auf `wartung/scripts/affine-a1-secrets.sh`. Das Skript liegt bewusst nur lokal (`.git/info/exclude`), bricht beim ersten Fehler ab, überschreibt nichts und entfernt unverschlüsselte Reste. Befund dazu: Nach dem ersten Versuch an Abend 2 lagen weder die beiden Dateien noch `apps/pantheon/affine/` im Repository (Ursache nicht geklärt); der Lauf mit dem Skript war erfolgreich.
+- **A.3 Übergangsmeldung dokumentiert:** `secrets "affine-db-role" is forbidden` an der DatabaseRole direkt nach dem Reconcile ist ein Wettlauf mit der RBAC-Aktualisierung des Operators und heilt sich selbst; `kubectl wait` statt Eingreifen. Ergebnisse von Teil A eingetragen.
 
 **1.1 (01.11.2026)** — Erkenntnisse aus Abend 1 (Teil 0 live) und Umstellung auf Umsetzung mit Claude Code.
 - **Korrektur Flux-Struktur:** Pantheon hat eine Flux-Kustomization pro App (`clusters/pantheon/apps-<name>.yaml`), keine gemeinsame über `apps/pantheon/`. B.8 ohne Eintrag in `apps/pantheon/kustomization.yaml`; neuer Schalter `clusters/pantheon/apps-affine.yaml` in C.1 (abgeleitet aus `apps-paperless.yaml`). Repository-Struktur und Definition of Done (6a) angepasst.
