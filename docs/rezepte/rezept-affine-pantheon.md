@@ -4,9 +4,9 @@
 >
 > Bewusst schlank: Alles, was die Nutzung verhindern oder stark einschränken würde, ist drin. Komfort- und Härtungsthemen stehen gesammelt unter **„Bewusst zurückgestellt"** — jeweils mit dem Risiko, das man bis dahin trägt.
 
-*Rezeptversion: 1.1.1 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
+*Rezeptversion: 1.1.2 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
 
-> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B und C am 01.11.2026 mit dem Rollout live verifiziert, Teil D am 01.11.2026. Teile E–F noch nicht live verifiziert. Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
+> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B und C am 01.11.2026 mit dem Rollout live verifiziert, Teil D am 01.11.2026, Teil E teilweise (E.1–E.3 und Einladungslink am 01.11.2026; E.4/E.5 offen). Teil F noch nicht live verifiziert. Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
 
 > **Umsetzung mit Claude Code.** Dieses Rezept ist so geschrieben, dass Claude Code (VS Code, Repo `~/k8s-cluster`, Leitplanken in `CLAUDE.md` und `.claude/settings.json`) alle Manifeste anlegt, prüft und committet. Rico greift nur an den mit **[Rico]** markierten Stellen ein: Secrets erzeugen und verschlüsseln, `git push` freigeben, Weboberflächen (Omni-Anmeldung, Cloudflare, AFFiNE-Admin). Alles mit **[Claude Code]** markierte erledigt Claude Code selbständig.
 
@@ -50,8 +50,8 @@ Acht Abende à etwa 30 Minuten. Nach jedem Abend kann man aufhören: Die Manifes
 | 4 ✅ 01.11. | Deployment, Service, Route, lokale Kustomization, Renovate-Regel | B.6–B.9 | Push freigeben | Manifeste, Build-Check, Commit | keine |
 | 5 ✅ 01.11. | Flux-Kustomization `apps-affine`, Rollout, Migrationslog, `/info` | Teil C | Push freigeben, ggf. Omni-Anmeldung | Datei anlegen, Commit, Verifikation | AFFiNE läuft intern |
 | 6 ✅ 01.11. | Access-Application, DNS-Eintrag, Admin-Konto — **ohne Pause dazwischen** | Teil D | Cloudflare-Dashboard, `cloudflared`-CLI, Admin anlegen | Gegenproben | extern erreichbar |
-| 7 | Partner-Konto, Workspace, Live-Test | Teil E | AFFiNE-Admin, Access-Policy, Test | Datenbank-Gegenprobe | Partner arbeitet mit |
-| 8 | Backup-Nachweis, Update-Regeln, Rezept fortschreiben | Teil F | On-Demand-Backup freigeben | Verifikation, Rezeptversion 1.2 | — |
+| 7 ◐ teilweise | Partner-Konto, Workspace, Live-Test — E.1–E.3 ✅ 01.11., Einladungssperre per Variante B behoben (Stolperstein 9); **E.4/E.5 offen**, nachholen nach Ricos Dienstreise | Teil E | AFFiNE-Admin, Access-Policy, Test | Datenbank-Gegenprobe | Partner arbeitet mit |
+| 8 ← nächster Schritt | Backup-Nachweis, Update-Regeln, Rezept fortschreiben | Teil F | On-Demand-Backup freigeben | Verifikation, Rezeptversion 1.2 | — |
 
 **Gesamtaufwand:** ≈ 3 h reine Arbeitszeit.
 
@@ -417,7 +417,8 @@ data:
       },
       "auth": {
         "allowSignup": false,
-        "requireEmailVerification": false
+        "requireEmailVerification": false,
+        "newAccountShareActionDelay": 0
       },
       "copilot": {
         "enabled": false
@@ -430,7 +431,10 @@ data:
 | `server.externalUrl` | Basis für Einladungs- und Share-Links **und** für die Origin-Prüfung. Bleibt sie leer, baut AFFiNE Links auf `http://localhost:3010`. |
 | `auth.allowSignup: false` | Keine Selbstregistrierung; Konten nur über Admin-Setup und CSV-Import (ADR 4). |
 | `auth.requireEmailVerification: false` | Ohne SMTP käme nie eine Verifikationsmail an. Vertretbar, weil Access vorgeschaltet und Signup geschlossen ist. |
+| `auth.newAccountShareActionDelay: 0` | Schaltet die Sperre ab, mit der AFFiNE Konten jünger als 24 h (Default `86400` s) keine Einladungslinks erstellen und keine Mitglieder einladen lässt (Stolperstein 9). Vertretbar, weil nur zwei Personen AFFiNE nutzen, die Registrierung geschlossen ist und Cloudflare Access mit OTP davorsitzt. |
 | `copilot.enabled: false` | Keine KI-Funktionen ohne konfigurierten Provider. |
+
+> **⚠️ Einladungssperre wieder aktivieren, sobald sich die Lage ändert.** `newAccountShareActionDelay: 0` ist nur für den Zwei-Personen-Betrieb hinter Access gedacht. Nutzen **mehr als zwei Personen** AFFiNE, wird die **Registrierung geöffnet** oder das **Access-Gate entfernt**, die Sperre wieder einschalten: den Eintrag entfernen (Default `86400` s) oder einen passenden Wert setzen. Sonst kann ein frisch angelegtes oder übernommenes Konto sofort Einladungs- und Share-Links verteilen. Siehe „Bewusst zurückgestellt", Punkt 10.
 
 > **Hinweis:** Unbekannte Schlüssel ignoriert AFFiNE stillschweigend (kein Startfehler). Ein Tippfehler in einem Schlüssel fällt deshalb nur am **Verhalten** auf — nach dem Start gezielt prüfen (Teil D/E).
 
@@ -987,7 +991,21 @@ kubectl cnpg psql pantheon-pg -n databases -- -d affine -tAc \
 - **Per E-Mail-Adresse** des importierten Partner-Kontos → der Partner sieht die Einladung über die **Benachrichtigungsglocke** in AFFiNE und nimmt sie dort an.
 - **Einladungslink** mit Ablaufzeit erzeugen und dem Partner schicken.
 
-Beide Wege funktionieren ohne Mailversand. Free-Self-Hosting erlaubt bis zu 10 Mitglieder pro Workspace.
+Beide Wege funktionieren ohne Mailversand. Free-Self-Hosting erlaubt bis zu 10 Mitglieder pro Workspace. **Voraussetzung:** Die Einladungssperre für neue Konten ist aus (B.3) oder das einladende Konto ist älter als 24 h — sonst Stolperstein 9.
+
+> **⚠️ Stolperstein 9 — Einladungen für Konten jünger als 24 h gesperrt.** AFFiNE 0.27.4 lässt Konten, die jünger sind als `auth.newAccountShareActionDelay` (Default `86400` s), weder Einladungslinks erstellen noch Mitglieder einladen. Signatur:
+> - **Einladungslink:** Meldung „This feature is temporarily unavailable for you." Im Log `action_forbidden` aus `WorkspaceMemberResolver.assertCanInviteOrShare` / `createInviteLink` (HTTP 403).
+> - **E-Mail-Invite:** Ohne SMTP endet er in einer **Endlos-Animation**, ohne Fehlermeldung in der Oberfläche. Im Log `WARN [InviteQuotaAssertService] Workspace invite quota rejected` mit `reason: 'quota_subject'`, `limit: 0`, `sourceTrusted: false`. Diese Prüfung liegt im nativen Modul (`server-native.x64.node`); ob `newAccountShareActionDelay: 0` auch sie freigibt, ist **nicht verifiziert** (am 01.11.2026 nicht erneut getestet).
+>
+> **Befund 01.11.2026** (Abend 7, Admin-Konto 26–35 min alt): `workspace_members` nur `active|1` (Eigentümer), **keine ausstehende Mitgliedschaft** aus dem E-Mail-Invite; im Log 2× `action_forbidden` (`createInviteLink`, 16:44 und 16:48 Uhr) und 1× `InviteQuotaAssertService … quota rejected` (16:45 Uhr). Gegenprobe im Image: `/app/dist/main.js` kennt `auth.newAccountShareActionDelay` („Minimum account age in seconds before new accounts can invite members or create share links.", `default: 86400`, `int().min(0)`), `assertCanInviteOrShare` rechnet direkt damit.
+>
+> **Lösung (Variante B, Commit `0fe316e`):** `"newAccountShareActionDelay": 0` unter `auth` in `config.json` (B.3), Push, Flux-Reconcile. AFFiNE liest `config.json` nur beim Start, daher Neustart — **von Rico im eigenen Terminal** (direkte Cluster-Änderung, Harte Regel 1):
+> ```bash
+> kubectl rollout restart deploy/affine -n affine
+> ```
+> Danach (Claude Code): `kubectl rollout status deploy/affine -n affine --timeout=10m`; Migrationslog fehlerfrei; `/info` wie C.3; `kubectl exec -n affine deploy/affine -c affine -- cat /root/.affine/config/config.json` zeigt den Eintrag (nur `config.json` lesen, nicht `private.key`). **Ergebnis 01.11.2026:** Neustart 18:03 Uhr, Rollout erfolgreich, `No pending migrations to apply.`, 0 Fehlerzeilen, `/info` `0.27.4`/`selfhosted`, `auth` enthält `"newAccountShareActionDelay": 0`; Einladungslink danach von Rico erfolgreich erzeugt, seit dem Neustart kein `action_forbidden` im Log.
+>
+> **Für künftige Durchläufe:** Abend 6 und 7 mit **mindestens 24 h Abstand** planen **oder** die Einstellung schon in B.3 setzen (so steht es seit 1.1.2 im Rezept).
 
 ## E.5 — Live-Test: das eigentliche Ziel
 
@@ -1094,8 +1112,8 @@ kubectl get backup -n databases --sort-by=.metadata.creationTimestamp | tail -2
 | 8 | Server-Schlüssel stabil | Migrationslog ohne `creating config file […private.key]` (C.2) |
 | 9 | Admin hinter Access angelegt | Access-App vor DNS, Admin-Setup erledigt (D.1–D.3) |
 | 10 | Registrierung geschlossen | Gegenprobe D.4 |
-| 11 | Partner kann mitarbeiten | Konto importiert, in Access freigeschaltet, Workspace-Mitglied (E.1–E.4) |
-| 12 | Live-Kollaboration | E.5 grün, WebSocket `101` |
+| 11 | Partner kann mitarbeiten | Konto importiert, in Access freigeschaltet, Workspace-Mitglied (E.1–E.4) — **offen** (E.1–E.3 ✅ 01.11.; Einladung annehmen E.4 nach Ricos Dienstreise) |
+| 12 | Live-Kollaboration | E.5 grün, WebSocket `101` — **offen** (nach Ricos Dienstreise) |
 | 13 | DB im Backup verifiziert | On-Demand-Backup `completed` nach Anlage der DB (F.1) |
 | 14 | Update-Weg definiert | F.2, erster Renovate-PR bewusst geprüft |
 
@@ -1114,10 +1132,20 @@ Jeder Punkt mit dem Risiko, das bis zur Umsetzung besteht. Reihenfolge = empfohl
 7. **Monitoring.** Fehlgeschlagene Migrationen fallen nur beim Öffnen auf. Fügt sich in den Observability-Einstieg (Paperless E.7 / Monitoring-Rezept CT 110–112) ein: `kube_pod_init_container_status_restarts_total{namespace="affine"}`.
 8. **OIDC über Keycloak**, sobald der OpenCloud-Stack steht (AFFiNE unterstützt OIDC im Admin-Panel).
 9. **Homepage-Kachel** (Block B).
+10. **Einladungssperre für neue Konten wieder aktivieren, sobald mehr als zwei Personen AFFiNE nutzen.** *Risiko:* Mit `auth.newAccountShareActionDelay: 0` (B.3, Stolperstein 9) kann jedes Konto ab der ersten Minute Einladungs- und Share-Links erzeugen. Hinter Access mit OTP, bei geschlossener Registrierung und zwei bekannten Personen vertretbar. *Auslöser:* mehr als zwei Personen, Registrierung geöffnet oder Access-Gate entfernt → Eintrag entfernen (Default `86400` s) oder passenden Wert setzen.
 
 ---
 
 ## Rezept-Changelog
+
+**1.1.2 (01.11.2026)** — Erkenntnisse aus Abend 7 (Teil E teilweise).
+- **Stolperstein 9 (neu, E.4):** AFFiNE 0.27.4 sperrt Einladungen für Konten jünger als 24 h (`auth.newAccountShareActionDelay`, Default `86400` s). Einladungslink: „This feature is temporarily unavailable for you."; E-Mail-Invite ohne SMTP: Endlos-Animation (`InviteQuotaAssertService`, `quota_subject`). Befund, Gegenprobe im Image und Lösung eingetragen.
+- **B.3:** `"newAccountShareActionDelay": 0` im `config.json`-Beispiel und in der Tabelle, Begründung (zwei Nutzer, Registrierung geschlossen, Access mit OTP) und Warnhinweis, die Sperre bei mehr Nutzern, offener Registrierung oder ohne Access-Gate wieder zu aktivieren. Umgesetzt mit Commit `0fe316e` (Variante B, Entscheidung Rico).
+- **Neustart nach Konfigurationsänderung:** `kubectl rollout restart` führt Rico im eigenen Terminal aus (Harte Regel 1); Claude Code prüft danach Rollout, Migrationslog, `/info` und `config.json` im Pod.
+- **Planungshinweis:** Abend 6 und 7 mit mindestens 24 h Abstand planen oder die Einstellung in B.3 setzen.
+- **„Bewusst zurückgestellt", Punkt 10 (neu):** Einladungssperre wieder aktivieren, sobald mehr als zwei Personen AFFiNE nutzen.
+- **Abend 7 teilweise:** E.1–E.3 ✅ 01.11., Einladungslink funktioniert; E.4 (Einladung annehmen) und E.5 (Live-Test mit dem Geschäftspartner) offen, nachzuholen nach Ricos Dienstreise. Definition of Done 11 und 12 als offen markiert. Abend 8 ist der nächste Schritt.
+- **Offen:** E-Mail-Invite nach der Änderung nicht erneut getestet.
 
 **1.1.1 (01.11.2026)** — Erkenntnisse aus Abend 2 (Teil A live), Abend 3 (B.1, B.3–B.5), Abend 4 (B.6–B.9), Abend 5 (Teil C live) und Abend 6 (Teil D live).
 - **A.1 als lokales Skript:** Statt des eingefügten Befehlsblocks verweist A.1 auf `wartung/scripts/affine-a1-secrets.sh`. Das Skript liegt bewusst nur lokal (`.git/info/exclude`), bricht beim ersten Fehler ab, überschreibt nichts und entfernt unverschlüsselte Reste. Befund dazu: Nach dem ersten Versuch an Abend 2 lagen weder die beiden Dateien noch `apps/pantheon/affine/` im Repository (Ursache nicht geklärt); der Lauf mit dem Skript war erfolgreich.
