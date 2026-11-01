@@ -1,0 +1,13 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: affine
+  namespace: databases
+spec:
+  cluster:
+    name: pantheon-pg
+  name: affine
+  ensure: present
+  login: true
+  passwordSecret:
+    name: affine-db-role

@@ -15,3 +15,6 @@ resources:
   - paperless-test-db-role-secret.yaml
   - paperless-test-role.yaml
   - paperless-test-database.yaml
+  - affine-db-role-secret.yaml
+  - affine-role.yaml
+  - affine-database.yaml
