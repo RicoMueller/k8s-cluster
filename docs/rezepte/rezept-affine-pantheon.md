@@ -47,7 +47,7 @@ Acht Abende à etwa 30 Minuten. Nach jedem Abend kann man aufhören: Die Manifes
 | 1 ✅ 27.10. | Vorab-Checks | Teil 0 | Befehle ausgeführt | — | keine |
 | 2 ✅ 01.11. | Beide Secrets, Datenbank-Rolle, Datenbank mit pgvector | A.1–A.3 | A.1 im eigenen Terminal, Push freigeben | A.2, A.3, Commit, Verifikation | Rolle + Datenbank live |
 | 3 ✅ 01.11. | Namespace, Konfiguration, Speicher, Redis | B.1, B.3–B.5 | Push freigeben | Manifeste, Build-Check, Commit | keine |
-| 4 | Deployment, Service, Route, lokale Kustomization, Renovate-Regel | B.6–B.9 | Push freigeben | Manifeste, Build-Check, Commit | keine |
+| 4 ✅ 01.11. | Deployment, Service, Route, lokale Kustomization, Renovate-Regel | B.6–B.9 | Push freigeben | Manifeste, Build-Check, Commit | keine |
 | 5 | Flux-Kustomization `apps-affine`, Rollout, Migrationslog, `/info` | Teil C | Push freigeben, ggf. Omni-Anmeldung | Datei anlegen, Commit, Verifikation | AFFiNE läuft intern |
 | 6 | Access-Application, DNS-Eintrag, Admin-Konto — **ohne Pause dazwischen** | Teil D | Cloudflare-Dashboard, `cloudflared`-CLI, Admin anlegen | Gegenproben | extern erreichbar |
 | 7 | Partner-Konto, Workspace, Live-Test | Teil E | AFFiNE-Admin, Access-Policy, Test | Datenbank-Gegenprobe | Partner arbeitet mit |
@@ -771,10 +771,14 @@ python3 -m json.tool renovate.json > /dev/null && echo JSON_OK
 **Commit Abend 4:**
 
 ```bash
-git add apps/pantheon/affine/ renovate.json
+A=apps/pantheon/affine
+git add "$A/deployment.yaml" "$A/service.yaml" "$A/httproute.yaml" "$A/kustomization.yaml" renovate.json
 git commit -m "feat(affine): add deployment, service, route and renovate rule (not yet reconciled)"
-git pull --rebase && git push            # Rico gibt den Push frei
+git show --stat HEAD                     # Rico Message + Dateiliste zeigen, Freigabe abwarten
+git pull --rebase && git push            # erst nach Ricos Freigabe
 ```
+
+> **Ergebnis 01.11.2026:** Commit `c2a1812`, `BUILD_OK` mit 9 Ressourcen (zusätzlich Deployment `affine`, Service `affine`, HTTPRoute `affine`); `AFFINE_DB_PASSWORD` steht in beiden Containern vor `DATABASE_URL`. `renovate.json` gültig; die Regex `^\d+\.\d+\.\d+$` lässt `0.27.4` zu und weist `0.28.0-beta.1`, `stable-<hash>`, `…-canary.N`, `candidate-…` und `latest` ab. Gegenproben im Cluster: Service `pantheon-pg-rw` (Port 5432) vorhanden, `pantheon-gateway` hat einen Listener `http`/80 mit `allowedRoutes: All`. Im Cluster noch keine Wirkung.
 
 ---
 
@@ -1082,12 +1086,13 @@ Jeder Punkt mit dem Risiko, das bis zur Umsetzung besteht. Reihenfolge = empfohl
 
 ## Rezept-Changelog
 
-**1.1.1 (01.11.2026)** — Erkenntnisse aus Abend 2 (Teil A live) und Abend 3 (B.1, B.3–B.5).
+**1.1.1 (01.11.2026)** — Erkenntnisse aus Abend 2 (Teil A live), Abend 3 (B.1, B.3–B.5) und Abend 4 (B.6–B.9).
 - **A.1 als lokales Skript:** Statt des eingefügten Befehlsblocks verweist A.1 auf `wartung/scripts/affine-a1-secrets.sh`. Das Skript liegt bewusst nur lokal (`.git/info/exclude`), bricht beim ersten Fehler ab, überschreibt nichts und entfernt unverschlüsselte Reste. Befund dazu: Nach dem ersten Versuch an Abend 2 lagen weder die beiden Dateien noch `apps/pantheon/affine/` im Repository (Ursache nicht geklärt); der Lauf mit dem Skript war erfolgreich.
 - **A.3 Staging und Push:** Dateien einzeln stagen statt `git add` auf das ganze Verzeichnis (CLAUDE.md: nur die Dateien des Schritts); vor dem Push Commit-Message und `git show --stat HEAD` zeigen und Ricos Freigabe abwarten. Von Rico am 01.11.2026 bestätigt.
 - **A.3 Übergangsmeldung dokumentiert:** `secrets "affine-db-role" is forbidden` an der DatabaseRole direkt nach dem Reconcile ist ein Wettlauf mit der RBAC-Aktualisierung des Operators und heilt sich selbst; `kubectl wait` statt Eingreifen. Ergebnisse von Teil A eingetragen.
 - **B.5 Redis-Tag:** `7.4-alpine` → `8.10-alpine`. Die Begründung „wie Paperless B.9" stimmte nicht mehr: Paperless ist per Renovate auf `8.10-alpine` (`e1e42aa`, `51a8269`). Von Rico am 01.11.2026 entschieden.
 - **Abschluss Abend 3:** Dateien einzeln stagen und Push-Freigabe wie in A.3. Ergebnisse von Abend 3 eingetragen.
+- **Commit Abend 4:** ebenso Dateien einzeln stagen und Push-Freigabe; B.6–B.9 ohne inhaltliche Abweichung umgesetzt, Ergebnisse eingetragen.
 
 **1.1 (01.11.2026)** — Erkenntnisse aus Abend 1 (Teil 0 live) und Umstellung auf Umsetzung mit Claude Code.
 - **Korrektur Flux-Struktur:** Pantheon hat eine Flux-Kustomization pro App (`clusters/pantheon/apps-<name>.yaml`), keine gemeinsame über `apps/pantheon/`. B.8 ohne Eintrag in `apps/pantheon/kustomization.yaml`; neuer Schalter `clusters/pantheon/apps-affine.yaml` in C.1 (abgeleitet aus `apps-paperless.yaml`). Repository-Struktur und Definition of Done (6a) angepasst.
