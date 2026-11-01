@@ -59,7 +59,7 @@ data:
         # außen Cloudflare Access mit 302 antwortet und die Kachel sonst auch bei
         # ausgefallenem AFFiNE grün wäre.
         - AFFiNE:
-            icon: affine.png
+            icon: affine-light.png
             href: https://affine.rm-it.org/
             description: Whiteboard
             siteMonitor: http://affine.affine.svc.cluster.local/info
