@@ -60,6 +60,11 @@
       "matchUpdateTypes": ["patch"],
       "automerge": true,
       "ignoreTests": true
+    },
+    {
+      "description": "AFFiNE veroeffentlicht neben X.Y.Z auch beta-, canary-, stable-<hash>- und candidate-<lauf>-Tags. Nur reine Release-Versionen zulassen. Beide image-Zeilen (initContainer migrate + Server) stehen im selben Deployment und werden gemeinsam angehoben.",
+      "matchPackageNames": ["ghcr.io/toeverything/affine"],
+      "allowedVersions": "/^\\d+\\.\\d+\\.\\d+$/"
     }
   ]
 }

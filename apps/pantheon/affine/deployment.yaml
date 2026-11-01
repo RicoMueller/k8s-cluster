@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: affine
+  namespace: affine
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate            # RWO-Blob-PVC: alter Pod muss erst loslassen
+  selector:
+    matchLabels:
+      app: affine
+  template:
+    metadata:
+      labels:
+        app: affine
+    spec:
+      # Paperless-Lehre (Stolperstein B): Service-Link-Variablen abschalten.
+      # Der Service "affine" würde sonst AFFINE_PORT, AFFINE_SERVICE_HOST, …
+      # injizieren — Namensraum-Kollisionsgefahr mit AFFiNEs eigenen AFFINE_*-Variablen.
+      enableServiceLinks: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: migrate
+          # Gleicher Tag wie der Server-Container — Renovate hebt beide in einem PR.
+          # renovate: datasource=docker depName=ghcr.io/toeverything/affine
+          image: ghcr.io/toeverything/affine:0.27.4
+          imagePullPolicy: IfNotPresent
+          command: ["node", "./scripts/self-host-predeploy.js"]
+          env:
+            - name: DEPLOYMENT_TYPE
+              value: selfhosted
+            # Reihenfolge wichtig: $(AFFINE_DB_PASSWORD) wird nur expandiert,
+            # wenn die Variable VOR DATABASE_URL definiert ist (Stolperstein 3).
+            - name: AFFINE_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: affine-secret
+                  key: db-password
+            - name: DATABASE_URL
+              value: postgresql://affine:$(AFFINE_DB_PASSWORD)@pantheon-pg-rw.databases.svc.cluster.local:5432/affine
+            - name: REDIS_SERVER_HOST
+              value: affine-redis
+            - name: AFFINE_INDEXER_ENABLED
+              value: "false"
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: config
+              mountPath: /root/.affine/config
+              readOnly: true
+            - name: storage
+              mountPath: /root/.affine/storage
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 1Gi
+      containers:
+        - name: affine
+          # renovate: datasource=docker depName=ghcr.io/toeverything/affine
+          image: ghcr.io/toeverything/affine:0.27.4
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3010
+          env:
+            - name: DEPLOYMENT_TYPE
+              value: selfhosted
+            - name: AFFINE_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: affine-secret
+                  key: db-password
+            - name: DATABASE_URL
+              value: postgresql://affine:$(AFFINE_DB_PASSWORD)@pantheon-pg-rw.databases.svc.cluster.local:5432/affine
+            - name: REDIS_SERVER_HOST
+              value: affine-redis
+            # Serverseitige Volltextsuche bräuchte einen Manticore/Elasticsearch-
+            # Container -> aus. Suche im Client funktioniert weiterhin.
+            - name: AFFINE_INDEXER_ENABLED
+              value: "false"
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: config
+              mountPath: /root/.affine/config
+              readOnly: true
+            - name: storage
+              mountPath: /root/.affine/storage
+          # /info ist öffentlich, prüft keinen Host-Header und liefert die Version
+          # (anders als Paperless kein Host-Header-Workaround nötig).
+          startupProbe:
+            httpGet:
+              path: /info
+              port: 3010
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /info
+              port: 3010
+            periodSeconds: 15
+          # Bewusst keine livenessProbe: Das Zusammenführen großer Dokumente kann
+          # den Event-Loop kurz blockieren -> Neustart mitten in der Arbeit vermeiden.
+          resources:
+            requests:
+              memory: 768Mi
+              cpu: 250m
+            limits:
+              memory: 3Gi     # Doku: 2 GB Minimum, Merge-Spitzen ~1 GB zusätzlich
+              cpu: "2"
+      volumes:
+        - name: config
+          projected:
+            sources:
+              - configMap:
+                  name: affine-config
+                  items:
+                    - key: config.json
+                      path: config.json
+              - secret:
+                  name: affine-secret
+                  items:
+                    - key: private.key
+                      path: private.key
+        - name: storage
+          persistentVolumeClaim:
+            claimName: affine-storage
