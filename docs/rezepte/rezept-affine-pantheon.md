@@ -6,7 +6,7 @@
 
 *Rezeptversion: 1.1.1 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
 
-> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B–F noch nicht live verifiziert. Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
+> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teil B wird erst mit Teil C live geprüft; Teile C–F noch nicht live verifiziert. Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
 
 > **Umsetzung mit Claude Code.** Dieses Rezept ist so geschrieben, dass Claude Code (VS Code, Repo `~/k8s-cluster`, Leitplanken in `CLAUDE.md` und `.claude/settings.json`) alle Manifeste anlegt, prüft und committet. Rico greift nur an den mit **[Rico]** markierten Stellen ein: Secrets erzeugen und verschlüsseln, `git push` freigeben, Weboberflächen (Omni-Anmeldung, Cloudflare, AFFiNE-Admin). Alles mit **[Claude Code]** markierte erledigt Claude Code selbständig.
 
@@ -46,7 +46,7 @@ Acht Abende à etwa 30 Minuten. Nach jedem Abend kann man aufhören: Die Manifes
 |---|---|---|---|---|---|
 | 1 ✅ 27.10. | Vorab-Checks | Teil 0 | Befehle ausgeführt | — | keine |
 | 2 ✅ 01.11. | Beide Secrets, Datenbank-Rolle, Datenbank mit pgvector | A.1–A.3 | A.1 im eigenen Terminal, Push freigeben | A.2, A.3, Commit, Verifikation | Rolle + Datenbank live |
-| 3 | Namespace, Konfiguration, Speicher, Redis | B.1, B.3–B.5 | Push freigeben | Manifeste, Build-Check, Commit | keine |
+| 3 ✅ 01.11. | Namespace, Konfiguration, Speicher, Redis | B.1, B.3–B.5 | Push freigeben | Manifeste, Build-Check, Commit | keine |
 | 4 | Deployment, Service, Route, lokale Kustomization, Renovate-Regel | B.6–B.9 | Push freigeben | Manifeste, Build-Check, Commit | keine |
 | 5 | Flux-Kustomization `apps-affine`, Rollout, Migrationslog, `/info` | Teil C | Push freigeben, ggf. Omni-Anmeldung | Datei anlegen, Commit, Verifikation | AFFiNE läuft intern |
 | 6 | Access-Application, DNS-Eintrag, Admin-Konto — **ohne Pause dazwischen** | Teil D | Cloudflare-Dashboard, `cloudflared`-CLI, Admin anlegen | Gegenproben | extern erreichbar |
@@ -454,7 +454,7 @@ spec:
 
 ## B.5 — Redis
 
-`apps/pantheon/affine/redis.yaml` — wie Paperless B.9, ohne Persistenz:
+`apps/pantheon/affine/redis.yaml` — wie Paperless B.9, ohne Persistenz, gleicher Tag wie `apps/pantheon/paperless/redis.yaml` (dort von Renovate gepflegt):
 
 ```yaml
 apiVersion: apps/v1
@@ -479,7 +479,7 @@ spec:
       containers:
         - name: redis
           # renovate: datasource=docker depName=redis
-          image: docker.io/library/redis:7.4-alpine
+          image: docker.io/library/redis:8.10-alpine
           imagePullPolicy: IfNotPresent
           args: ["--save", "", "--appendonly", "no"]
           ports:
@@ -525,10 +525,14 @@ resources:
 
 ```bash
 kubectl kustomize apps/pantheon/affine/ > /dev/null && echo BUILD_OK
-git add apps/pantheon/affine/
+A=apps/pantheon/affine
+git add "$A/namespace.yaml" "$A/configmap.yaml" "$A/pvc.yaml" "$A/redis.yaml" "$A/kustomization.yaml"
 git commit -m "feat(affine): add namespace, config, storage and redis (not yet reconciled)"
-git pull --rebase && git push            # Rico gibt den Push frei
+git show --stat HEAD                     # Rico Message + Dateiliste zeigen, Freigabe abwarten
+git pull --rebase && git push            # erst nach Ricos Freigabe
 ```
+
+> **Ergebnis 01.11.2026:** Commit `5ff73c7`, `BUILD_OK` mit 6 Ressourcen (Namespace, Secret, ConfigMap, PVC, Deployment, Service), `config.json` gültig. StorageClass `qnap-iscsi` vorhanden (Trident, `allowVolumeExpansion: true`, `reclaimPolicy: Delete`). Im Cluster noch keine Wirkung (kein `apps-affine.yaml`).
 
 ## B.6 — Deployment (initContainer + Server)
 
@@ -1078,10 +1082,12 @@ Jeder Punkt mit dem Risiko, das bis zur Umsetzung besteht. Reihenfolge = empfohl
 
 ## Rezept-Changelog
 
-**1.1.1 (01.11.2026)** — Erkenntnisse aus Abend 2 (Teil A live).
+**1.1.1 (01.11.2026)** — Erkenntnisse aus Abend 2 (Teil A live) und Abend 3 (B.1, B.3–B.5).
 - **A.1 als lokales Skript:** Statt des eingefügten Befehlsblocks verweist A.1 auf `wartung/scripts/affine-a1-secrets.sh`. Das Skript liegt bewusst nur lokal (`.git/info/exclude`), bricht beim ersten Fehler ab, überschreibt nichts und entfernt unverschlüsselte Reste. Befund dazu: Nach dem ersten Versuch an Abend 2 lagen weder die beiden Dateien noch `apps/pantheon/affine/` im Repository (Ursache nicht geklärt); der Lauf mit dem Skript war erfolgreich.
 - **A.3 Staging und Push:** Dateien einzeln stagen statt `git add` auf das ganze Verzeichnis (CLAUDE.md: nur die Dateien des Schritts); vor dem Push Commit-Message und `git show --stat HEAD` zeigen und Ricos Freigabe abwarten. Von Rico am 01.11.2026 bestätigt.
 - **A.3 Übergangsmeldung dokumentiert:** `secrets "affine-db-role" is forbidden` an der DatabaseRole direkt nach dem Reconcile ist ein Wettlauf mit der RBAC-Aktualisierung des Operators und heilt sich selbst; `kubectl wait` statt Eingreifen. Ergebnisse von Teil A eingetragen.
+- **B.5 Redis-Tag:** `7.4-alpine` → `8.10-alpine`. Die Begründung „wie Paperless B.9" stimmte nicht mehr: Paperless ist per Renovate auf `8.10-alpine` (`e1e42aa`, `51a8269`). Von Rico am 01.11.2026 entschieden.
+- **Abschluss Abend 3:** Dateien einzeln stagen und Push-Freigabe wie in A.3. Ergebnisse von Abend 3 eingetragen.
 
 **1.1 (01.11.2026)** — Erkenntnisse aus Abend 1 (Teil 0 live) und Umstellung auf Umsetzung mit Claude Code.
 - **Korrektur Flux-Struktur:** Pantheon hat eine Flux-Kustomization pro App (`clusters/pantheon/apps-<name>.yaml`), keine gemeinsame über `apps/pantheon/`. B.8 ohne Eintrag in `apps/pantheon/kustomization.yaml`; neuer Schalter `clusters/pantheon/apps-affine.yaml` in C.1 (abgeleitet aus `apps-paperless.yaml`). Repository-Struktur und Definition of Done (6a) angepasst.
