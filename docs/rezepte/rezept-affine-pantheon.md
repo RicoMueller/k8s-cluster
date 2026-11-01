@@ -343,9 +343,12 @@ kubectl kustomize infrastructure/controllers/databases/pantheon-pg/ > /dev/null 
 ## A.3 — Committen und verifizieren *[Claude Code; Push: Rico gibt frei]*
 
 ```bash
-git add infrastructure/controllers/databases/pantheon-pg/ apps/pantheon/affine/affine-secret.yaml
+D=infrastructure/controllers/databases/pantheon-pg
+git add "$D/affine-db-role-secret.yaml" "$D/affine-role.yaml" "$D/affine-database.yaml" \
+  "$D/kustomization.yaml" apps/pantheon/affine/affine-secret.yaml
 git commit -m "feat(affine): add database role, database with pgvector and app secret"
-git pull --rebase && git push            # Rico gibt den Push frei
+git show --stat HEAD                     # Rico Message + Dateiliste zeigen, Freigabe abwarten
+git pull --rebase && git push            # erst nach Ricos Freigabe
 flux reconcile kustomization flux-system --with-source
 flux reconcile kustomization infrastructure-databases-cluster
 
@@ -1077,6 +1080,7 @@ Jeder Punkt mit dem Risiko, das bis zur Umsetzung besteht. Reihenfolge = empfohl
 
 **1.1.1 (01.11.2026)** — Erkenntnisse aus Abend 2 (Teil A live).
 - **A.1 als lokales Skript:** Statt des eingefügten Befehlsblocks verweist A.1 auf `wartung/scripts/affine-a1-secrets.sh`. Das Skript liegt bewusst nur lokal (`.git/info/exclude`), bricht beim ersten Fehler ab, überschreibt nichts und entfernt unverschlüsselte Reste. Befund dazu: Nach dem ersten Versuch an Abend 2 lagen weder die beiden Dateien noch `apps/pantheon/affine/` im Repository (Ursache nicht geklärt); der Lauf mit dem Skript war erfolgreich.
+- **A.3 Staging und Push:** Dateien einzeln stagen statt `git add` auf das ganze Verzeichnis (CLAUDE.md: nur die Dateien des Schritts); vor dem Push Commit-Message und `git show --stat HEAD` zeigen und Ricos Freigabe abwarten. Von Rico am 01.11.2026 bestätigt.
 - **A.3 Übergangsmeldung dokumentiert:** `secrets "affine-db-role" is forbidden` an der DatabaseRole direkt nach dem Reconcile ist ein Wettlauf mit der RBAC-Aktualisierung des Operators und heilt sich selbst; `kubectl wait` statt Eingreifen. Ergebnisse von Teil A eingetragen.
 
 **1.1 (01.11.2026)** — Erkenntnisse aus Abend 1 (Teil 0 live) und Umstellung auf Umsetzung mit Claude Code.
