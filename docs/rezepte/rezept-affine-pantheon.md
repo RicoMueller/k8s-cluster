@@ -1,12 +1,12 @@
 # Kochrezept: AFFiNE auf Pantheon (Whiteboard statt Apple Freeform)
 
-> Schnell-Rezept für einen Nachmittag: AFFiNE als kollaboratives Whiteboard auf dem Pantheon-Cluster, von außen über Cloudflare Tunnel + Access erreichbar, gemeinsam mit einer zweiten Person live bearbeitbar. Datenbank im Shared-Cluster `pantheon-pg` (automatisch im Barman-Backup), Updates ausschließlich über Renovate-PRs und Flux.
+> Schnell-Rezept für einen Nachmittag: AFFiNE als kollaboratives Whiteboard auf dem Pantheon-Cluster, von außen über Cloudflare Tunnel erreichbar (Access-Gate seit 04.11.2026 per Bypass gelockert, ADR 4), gemeinsam mit einer zweiten Person live bearbeitbar. Datenbank im Shared-Cluster `pantheon-pg` (automatisch im Barman-Backup), Updates ausschließlich über Renovate-PRs und Flux.
 >
 > Bewusst schlank: Alles, was die Nutzung verhindern oder stark einschränken würde, ist drin. Komfort- und Härtungsthemen stehen gesammelt unter **„Bewusst zurückgestellt"** — jeweils mit dem Risiko, das man bis dahin trägt.
 
-*Rezeptversion: 1.2 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
+*Rezeptversion: 1.3 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
 
-> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B und C am 01.11.2026 mit dem Rollout live verifiziert, Teil D am 01.11.2026, Teil E teilweise (E.1–E.3 und Einladungslink am 01.11.2026; E.4/E.5 offen). Teil F am 01.11.2026 live verifiziert (erster Renovate-Pull-Request für AFFiNE steht noch aus). Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
+> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B und C am 01.11.2026 mit dem Rollout live verifiziert, Teil D am 01.11.2026, Teil E teilweise (E.1–E.3 und Einladungslink am 01.11.2026, E.4 Beitritt per Link am 04.11.2026; E.5 offen). Teil F am 01.11.2026 live verifiziert (erster Renovate-Pull-Request für AFFiNE steht noch aus). Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
 
 > **Umsetzung mit Claude Code.** Dieses Rezept ist so geschrieben, dass Claude Code (VS Code, Repo `~/k8s-cluster`, Leitplanken in `CLAUDE.md` und `.claude/settings.json`) alle Manifeste anlegt, prüft und committet. Rico greift nur an den mit **[Rico]** markierten Stellen ein: Secrets erzeugen und verschlüsseln, `git push` freigeben, Weboberflächen (Omni-Anmeldung, Cloudflare, AFFiNE-Admin). Alles mit **[Claude Code]** markierte erledigt Claude Code selbständig.
 
@@ -32,7 +32,7 @@
 
 Apple Freeform durch AFFiNE ablösen: unendliches Canvas („Edgeless"), Notizzettel, Formen, Verbinder, Bilder, Stift — plus Dokumente und Datenbanken im selben Workspace. Ergebnis dieses Rezepts:
 
-1. AFFiNE läuft unter `https://affine.rm-it.org`, abgesichert durch Cloudflare Access (E-Mail-OTP) **vor** dem AFFiNE-Login.
+1. AFFiNE läuft unter `https://affine.rm-it.org`. Bis 04.11.2026 abgesichert durch Cloudflare Access (E-Mail-OTP) **vor** dem AFFiNE-Login; seitdem per Bypass gelockert, damit die nativen Apps funktionieren (ADR 4, Nachtrag).
 2. Ein Admin-Konto (Rico) und ein Partner-Konto existieren; Selbstregistrierung ist geschlossen.
 3. Ein gemeinsamer Server-Workspace, in dem beide gleichzeitig am selben Whiteboard arbeiten.
 4. Die Datenbank liegt in `pantheon-pg` und ist damit ohne Zusatzaufwand im WAL-Archiving und den täglichen Barman-Backups nach Hetzner.
@@ -150,6 +150,22 @@ Acht Abende à etwa 30 Minuten. Nach jedem Abend kann man aufhören: Die Manifes
 > **Verworfene Alternativen:**
 > - *Admin-Setup per `kubectl port-forward`:* Der Browser-Origin wäre `http://localhost:3010`, AFFiNE erlaubt aber nur den Origin der `externalUrl` — Schreib-Requests würden abgelehnt. Zusätzlich sind Port-Forwards über den Omni-Proxy unzuverlässig.
 > - *Offene Registrierung + SMTP:* zusätzlicher Dienst (Mail-Relay, Zugangsdaten, SPF) für zwei Nutzer — „kein spekulatives Tooling".
+>
+> **Nachtrag 04.11.2026 — Access per Bypass gelockert (Entscheidung Rico).**
+> - **Anlass:** Die nativen AFFiNE-Apps (macOS, iOS, iPadOS) haben keine Browser-Session; Cloudflare Access antwortet ihnen mit einer Umleitung zur Anmeldeseite, die Apps scheitern („Bewusst zurückgestellt", Punkt 3).
+> - **Entscheidung, in Ricos Worten:** „Der Schutz ist für die App und deren Inhalte sowie die Anzahl an Nutzern unangemessen. Der Mehrwert, die App nutzen zu können, übersteigt den Verlust an Sicherheit deutlich. Bei Paperless ist es auf Grund der Art der Informationen angemessen."
+> - **Umsetzung (Cloudflare-Dashboard, nicht im Repository):** Access-Application `AFFiNE` hat die Policy `affine-bypass` (Action **Bypass**, Include **Everyone**) an erster Stelle; `affine-allow` bleibt hinterlegt.
+> - **Verbleibender Schutz:** geschlossene Registrierung (`auth.allowSignup: false`); Admin-Konto existiert, das Erster-Besucher-Risiko entfällt; AFFiNE-Login mit Passwort; Drosselung von Anmeldeversuchen durch AFFiNE; TLS am Cloudflare-Edge; keine Portfreigabe am Router (Tunnel).
+> - **Abgrenzung:** Paperless bleibt hinter Access mit OTP — Schutzbedarf der Dokumente.
+> - **Rücknahme:** Policy `affine-bypass` löschen → Access mit OTP greift sofort wieder (Browser ja, Apps dann nicht mehr).
+> - **Neu bewerten, wenn** mehr als zwei Personen AFFiNE nutzen, sensiblere Inhalte dort landen oder die Registrierung geöffnet wird. Dann zugleich die Einladungssperre (B.3, `newAccountShareActionDelay`) wieder aktivieren.
+> - **Ergebnis 04.11.2026** (von außen, ohne Anmeldung): `curl -sI https://affine.rm-it.org/` → `HTTP/2 200`; `/info` → `{"compatibility":"0.27.4","message":"AFFiNE 0.27.4 Server","type":"selfhosted","flavor":"allinone"}`; WebSocket-Upgrade auf `/socket.io/?EIO=4&transport=websocket` → `101`. Gegenprobe Paperless: weiterhin `HTTP/2 302` auf `rm-it.cloudflareaccess.com`. Native Apps: Bestätigung durch Rico steht noch aus.
+> - **Verworfene Alternativen:** *Cloudflare-Client (WARP) mit „WARP authentication identity"* auf jedem Gerät — voller Schutz, aber zusätzliche Software auf jedem Gerät, auch beim Geschäftspartner, und standardmäßig dessen gesamter Internetverkehr über Cloudflare. *Service-Token* — scheidet aus, weil die AFFiNE-Apps keine eigenen Header (`CF-Access-Client-Id`) senden können. *Bypass nur für API-Pfade* — bringt praktisch nichts, weil die Weboberfläche dieselben Schnittstellen nutzt.
+
+> **⚠️ Stolperstein 11 — „Allow + Everyone" ist kein Bypass.** Bei Cloudflare Access heißt **Allow** mit Include **Everyone**: Jeder darf rein, *nachdem* er sich angemeldet hat — die OTP-Abfrage bleibt, und jede beliebige E-Mail-Adresse kommt per OTP durch. Nur die Action **Bypass** schaltet die Anmeldung ab. Zweite Falle der aktuellen Oberfläche: Policies, die in der **Policy-Liste** angelegt werden, gelten erst, wenn sie der **Application zugeordnet** sind (Application → Policies → vorhandene Policy auswählen → an erste Stelle → Application speichern).
+> - **Signatur:** `curl -sI https://affine.rm-it.org/` liefert weiterhin `HTTP/2 302` auf `…cloudflareaccess.com/cdn-cgi/access/login/affine.rm-it.org`; im `meta`-Token der Umleitung steht `"hostname":"affine.rm-it.org"` und `"auth_status":"NONE"`. Der WebSocket-Upgrade liefert `302` statt `101`.
+> - **Befund 04.11.2026:** Erster Versuch mit Action *Allow* → unverändert `302`; nach Umstellung auf *Bypass* sofort `200`/`101`.
+> - **Prüfung nach jeder Änderung an Access:** die vier Tests aus dem Ergebnis oben (AFFiNE `/`, `/info`, WebSocket, Gegenprobe Paperless).
 
 ---
 
@@ -434,7 +450,7 @@ data:
 | `auth.newAccountShareActionDelay: 0` | Schaltet die Sperre ab, mit der AFFiNE Konten jünger als 24 h (Default `86400` s) keine Einladungslinks erstellen und keine Mitglieder einladen lässt (Stolperstein 9). Vertretbar, weil nur zwei Personen AFFiNE nutzen, die Registrierung geschlossen ist und Cloudflare Access mit OTP davorsitzt. |
 | `copilot.enabled: false` | Keine KI-Funktionen ohne konfigurierten Provider. |
 
-> **⚠️ Einladungssperre wieder aktivieren, sobald sich die Lage ändert.** `newAccountShareActionDelay: 0` ist nur für den Zwei-Personen-Betrieb hinter Access gedacht. Nutzen **mehr als zwei Personen** AFFiNE, wird die **Registrierung geöffnet** oder das **Access-Gate entfernt**, die Sperre wieder einschalten: den Eintrag entfernen (Default `86400` s) oder einen passenden Wert setzen. Sonst kann ein frisch angelegtes oder übernommenes Konto sofort Einladungs- und Share-Links verteilen. Siehe „Bewusst zurückgestellt", Punkt 10.
+> **⚠️ Einladungssperre wieder aktivieren, sobald sich die Lage ändert.** `newAccountShareActionDelay: 0` ist nur für den Zwei-Personen-Betrieb bei geschlossener Registrierung gedacht (neue Konten legt nur der Admin an). Nutzen **mehr als zwei Personen** AFFiNE oder wird die **Registrierung geöffnet**, die Sperre wieder einschalten: den Eintrag entfernen (Default `86400` s) oder einen passenden Wert setzen. Sonst kann ein frisch angelegtes oder übernommenes Konto sofort Einladungs- und Share-Links verteilen. Siehe „Bewusst zurückgestellt", Punkt 10.
 
 > **Hinweis:** Unbekannte Schlüssel ignoriert AFFiNE stillschweigend (kein Startfehler). Ein Tippfehler in einem Schlüssel fällt deshalb nur am **Verhalten** auf — nach dem Start gezielt prüfen (Teil D/E).
 
@@ -963,11 +979,15 @@ kubectl cnpg psql pantheon-pg -n databases -- -d affine -tAc \
    ```
 2. **Admin-Panel → Accounts → Import** → Datei hochladen.
 3. Datei lokal löschen (`rm affine-users.csv`) — sie enthält ein Klartext-Passwort.
-4. Das Passwort dem Partner auf sicherem Weg geben; er kann es nach dem ersten Login im Profil ändern.
+4. Das Passwort dem Partner auf sicherem Weg geben (getrennt von Link und Benutzername, z.B. per Messenger). Selbst ändern kann er es ohne SMTP **nicht** — siehe Stolperstein 10.
 
 > **Passwort vergessen ohne SMTP:** Admin-Panel → Accounts → Menü am User → **Reset Password** zeigt einen Reset-Link zum manuellen Weitergeben.
 
+> **⚠️ Stolperstein 10 — Passwort ändern und E-Mail verifizieren brauchen SMTP.** In AFFiNE laufen „Passwort ändern" und „E-Mail verifizieren" (Kontoeinstellungen) über einen Link per Mail. Ohne SMTP scheitert der Versand mit „Der Bestätigungslink konnte nicht gesendet werden" (Befund 04.11.2026, Geschäftspartner). **Weg:** Admin-Panel → Accounts → Menü am User → **Reset Password** → den angezeigten Link über einen sicheren Kanal weitergeben (wie ein Passwort behandeln); der Nutzer setzt sein Passwort darüber selbst, höchstens 32 Zeichen. „E-Mail verifizieren" ist unkritisch, weil `auth.requireEmailVerification: false` gesetzt ist. In der Anleitung für neue Nutzer darauf hinweisen.
+
 ## E.2 — Partner in Access freischalten
+
+> **Seit 04.11.2026 ohne Wirkung:** Access ist per Bypass gelockert (ADR 4, Nachtrag). Der Schritt bleibt dokumentiert, falls der Bypass zurückgenommen wird.
 
 **Zero Trust → Access → Applications → AFFiNE → Policy `affine-allow`** → Partner-Adresse unter **Include → Emails** ergänzen.
 
@@ -991,7 +1011,17 @@ kubectl cnpg psql pantheon-pg -n databases -- -d affine -tAc \
 - **Per E-Mail-Adresse** des importierten Partner-Kontos → der Partner sieht die Einladung über die **Benachrichtigungsglocke** in AFFiNE und nimmt sie dort an.
 - **Einladungslink** mit Ablaufzeit erzeugen und dem Partner schicken.
 
-Beide Wege funktionieren ohne Mailversand. Free-Self-Hosting erlaubt bis zu 10 Mitglieder pro Workspace. **Voraussetzung:** Die Einladungssperre für neue Konten ist aus (B.3) oder das einladende Konto ist älter als 24 h — sonst Stolperstein 9.
+Beide Wege funktionieren ohne Mailversand. Free-Self-Hosting erlaubt bis zu 10 Mitglieder pro Workspace.
+
+> **Beitritt per Link = Beitrittsanfrage.** Öffnet der Partner den Einladungslink, legt AFFiNE nur eine **Anfrage** an („Anfrage erfolgreich gesendet … Der Workspace-Besitzer und die Team-Administratoren werden deine Anfrage prüfen.", Mitgliedsstatus „wartet auf Prüfung"). Der Besitzer muss sie unter **Workspace-Einstellungen → Mitglieder** (oder über die Glocke) **annehmen**; erst dann sieht der Partner den Workspace. Befund 04.11.2026.
+>
+> **Ergebnis 04.11.2026:** Anfrage angenommen. `workspace_members` pro Workspace (ohne E-Mail-Adressen):
+> ```
+> a60b8545|Rico|owner|active     ← gemeinsamer Workspace
+> a60b8545|Franz|member|active
+> f3701f72|Franz|owner|active    ← von Franz selbst angelegter Server-Workspace
+> ```
+> Prüfabfrage: `SELECT left(m.workspace_id, 8), u.name, m.role, m.state FROM workspace_members m JOIN users u ON u.id = m.user_id ORDER BY m.workspace_id, m.created_at;` — eine Zählung über `GROUP BY state` allein summiert über **alle** Workspaces und ist deshalb missverständlich. **Voraussetzung:** Die Einladungssperre für neue Konten ist aus (B.3) oder das einladende Konto ist älter als 24 h — sonst Stolperstein 9.
 
 > **⚠️ Stolperstein 9 — Einladungen für Konten jünger als 24 h gesperrt.** AFFiNE 0.27.4 lässt Konten, die jünger sind als `auth.newAccountShareActionDelay` (Default `86400` s), weder Einladungslinks erstellen noch Mitglieder einladen. Signatur:
 > - **Einladungslink:** Meldung „This feature is temporarily unavailable for you." Im Log `action_forbidden` aus `WorkspaceMemberResolver.assertCanInviteOrShare` / `createInviteLink` (HTTP 403).
@@ -1030,7 +1060,7 @@ Beide Wege funktionieren ohne Mailversand. Free-Self-Hosting erlaubt bis zu 10 M
 >    ```
 >    Erst einbauen, wenn das Symptom auftritt — nicht vorsorglich.
 
-> **⚠️ Stolperstein 6 — Access-Session läuft ab.** Endet die Cloudflare-Access-Session während der Arbeit, kann der WebSocket nicht neu verbinden (kein gültiges Access-Cookie) — die Seite lädt neu und fragt das OTP ab. Nichts geht verloren (AFFiNE puffert lokal), aber die Session-Dauer in D.1 nicht zu kurz wählen.
+> **⚠️ Stolperstein 6 — Access-Session läuft ab.** *(Entfällt seit 04.11.2026 durch den Bypass, ADR 4; gilt wieder, wenn der Bypass zurückgenommen wird.)* Endet die Cloudflare-Access-Session während der Arbeit, kann der WebSocket nicht neu verbinden (kein gültiges Access-Cookie) — die Seite lädt neu und fragt das OTP ab. Nichts geht verloren (AFFiNE puffert lokal), aber die Session-Dauer in D.1 nicht zu kurz wählen.
 
 ---
 
@@ -1128,9 +1158,9 @@ kubectl get backup $B -n databases -o jsonpath='{.status.phase} {.status.started
 | 6a | Flux-Kustomization | `clusters/pantheon/apps-affine.yaml` mit SOPS, `wait: false`, `READY True` (C.1) |
 | 7 | pgvector deklarativ | `extensions` in der `Database`-CR, `pg_extension` zeigt `vector` (A.3) |
 | 8 | Server-Schlüssel stabil | Migrationslog ohne `creating config file […private.key]` (C.2) |
-| 9 | Admin hinter Access angelegt | Access-App vor DNS, Admin-Setup erledigt (D.1–D.3) |
+| 9 | Admin hinter Access angelegt | Access-App vor DNS, Admin-Setup erledigt (D.1–D.3); Access seit 04.11.2026 per Bypass gelockert (ADR 4, Nachtrag) |
 | 10 | Registrierung geschlossen | Gegenprobe D.4 |
-| 11 | Partner kann mitarbeiten | Konto importiert, in Access freigeschaltet, Workspace-Mitglied (E.1–E.4) — **offen** (E.1–E.3 ✅ 01.11.; Einladung annehmen E.4 nach Ricos Dienstreise) |
+| 11 | Partner kann mitarbeiten | Konto importiert, Workspace-Mitglied (E.1–E.4) — ✅ 04.11.2026 (`a60b8545`: Rico `owner`, Franz `member`, beide `active`) |
 | 12 | Live-Kollaboration | E.5 grün, WebSocket `101` — **offen** (nach Ricos Dienstreise) |
 | 13 | DB im Backup verifiziert | On-Demand-Backup `completed` nach Anlage der DB (F.1) — ✅ 01.11. (`pantheon-pg-20261101181813`) |
 | 14 | Update-Weg definiert | F.2, erster Renovate-PR bewusst geprüft — **offen**: Weg definiert, Renovate läuft; erster AFFiNE-Pull-Request steht noch aus |
@@ -1142,20 +1172,29 @@ kubectl get backup $B -n databases -o jsonpath='{.status.phase} {.status.started
 Jeder Punkt mit dem Risiko, das bis zur Umsetzung besteht. Reihenfolge = empfohlene Priorität.
 
 1. **Off-site-Sicherung des Blob-Storage.** *Risiko:* Bilder und Anhänge liegen nur auf der QNAP; ein NAS-Totalausfall ließe die Whiteboards ohne eingefügte Bilder zurück (Formen, Text, Notizen in der DB bleiben erhalten). *Interim:* das iSCSI-LUN von `affine-storage` in die QNAP-Snapshot-Planung aufnehmen. *Umsetzung später:* rclone-CronJob nach dem Muster Paperless E.6 (eigener Storage-Box-Sub-Account, Ziel-Unterverzeichnis statt Wurzel — Stolperstein U, `podAffinity` wegen RWO wie Paperless E.3) **oder** Blob-Provider `aws-s3` auf einen eigenen Hetzner-Bucket (dann gehört `config.json` in ein SOPS-Secret statt in eine ConfigMap).
-2. **SMTP / Mailer.** *Risiko:* keine Benachrichtigungsmails, Passwort-Reset nur über den Admin-Link (E.1). Für zwei Nutzer akzeptabel.
-3. **Native Apps (iPad, macOS-Desktop) über Access.** *Risiko:* Die Apps haben keine Browser-Session und scheitern am Access-Gate. *Interim:* AFFiNE im Browser nutzen — auch auf dem iPad in Safari. *Später:* Access-Service-Token oder Bypass-Policy für die API-Pfade; vorher Client-Kompatibilität (≥ 0.26 bei Server 0.27) prüfen.
+2. **SMTP / Mailer.** *Risiko:* keine Benachrichtigungsmails, Passwort-Reset nur über den Admin-Link (E.1); Nutzer können ihr Passwort auch **nicht selbst ändern** (Stolperstein 10). Für zwei Nutzer akzeptabel.
+3. ~~**Native Apps (iPad, macOS-Desktop) über Access.**~~ ✅ **Erledigt 04.11.2026** durch die Bypass-Policy `affine-bypass` (ADR 4, Nachtrag; verworfene Alternativen dort). *Betriebshinweis:* Server 0.27 akzeptiert Apps ab 0.26. Laufen die Apps aus dem App Store einer neuen Serverversion voraus, kann die Synchronisation stoppen — dann den nächsten AFFiNE-Pull-Request von Renovate zügig mergen.
 4. **Serverseitige Volltextsuche** (Indexer mit Manticore). Ohne: Suche läuft clientseitig, bei vielen Workspaces langsamer.
 5. **Freeform-Bestand.** Freeform hat kein offenes Exportformat; bestehende Boards nur als PDF/Bild exportieren und als Anhang/Bild in AFFiNE ablegen.
 6. **`restricted`-Härtung.** Das Image läuft als root; ob es mit `runAsNonRoot` und umgebogenem `HOME` startet, ist ungeprüft — eigenes Vorhaben, nicht nebenbei.
 7. **Monitoring.** Fehlgeschlagene Migrationen fallen nur beim Öffnen auf. Fügt sich in den Observability-Einstieg (Paperless E.7 / Monitoring-Rezept CT 110–112) ein: `kube_pod_init_container_status_restarts_total{namespace="affine"}`.
 8. **OIDC über Keycloak**, sobald der OpenCloud-Stack steht (AFFiNE unterstützt OIDC im Admin-Panel).
 9. **Homepage-Kachel** (Block B).
-10. **Einladungssperre für neue Konten wieder aktivieren, sobald mehr als zwei Personen AFFiNE nutzen.** *Risiko:* Mit `auth.newAccountShareActionDelay: 0` (B.3, Stolperstein 9) kann jedes Konto ab der ersten Minute Einladungs- und Share-Links erzeugen. Hinter Access mit OTP, bei geschlossener Registrierung und zwei bekannten Personen vertretbar. *Auslöser:* mehr als zwei Personen, Registrierung geöffnet oder Access-Gate entfernt → Eintrag entfernen (Default `86400` s) oder passenden Wert setzen.
+10. **Einladungssperre für neue Konten wieder aktivieren, sobald mehr als zwei Personen AFFiNE nutzen.** *Risiko:* Mit `auth.newAccountShareActionDelay: 0` (B.3, Stolperstein 9) kann jedes Konto ab der ersten Minute Einladungs- und Share-Links erzeugen. Bei geschlossener Registrierung und zwei bekannten Personen vertretbar. Hinter Access gelockert (seit 04.11.2026) weiterhin vertretbar, weil neue Konten nur der Admin anlegt. *Auslöser:* mehr als zwei Personen oder Registrierung geöffnet → Eintrag entfernen (Default `86400` s) oder passenden Wert setzen.
 11. **Blob-PVC gegen Löschen absichern (gemeinsam mit Paperless).** *Risiko:* Das PV von `affine-storage` hat `reclaimPolicy: Delete` (StorageClass `qnap-iscsi`), `apps-affine` läuft mit `prune: true`. Fliegt `pvc.yaml` aus der `kustomization.yaml` oder wird `apps-affine` bzw. der Namespace entfernt, löscht Flux die PVC — Bilder und Anhänge wären weg (Whiteboards, Konten und Workspaces liegen in der DB und sind gesichert). Paperless hat dieselbe Lage. *Bewertung:* Die Flux-Annotation `kustomize.toolkit.fluxcd.io/prune: disabled` an der PVC schützt nur vor dem ersten Fall, nicht vor dem Löschen des Namespace; `Retain` ginge nur per direktem Patch am PV oder über eine eigene StorageClass (Shared-Infrastruktur). *Umsetzung später:* als eigenes Vorhaben für beide Apps, zusammen mit Punkt 1. Entscheidung Rico 01.11.2026.
 
 ---
 
 ## Rezept-Changelog
+
+**1.3 (04.11.2026)** — Native Apps, Beitritt per Link, Passwortwechsel ohne SMTP.
+- **ADR 4, Nachtrag:** Access für AFFiNE per Bypass-Policy `affine-bypass` gelockert (Entscheidung Rico), damit die nativen Apps funktionieren. Begründung, verbleibender Schutz, Abgrenzung zu Paperless, Rücknahme, Auslöser zur Neubewertung und verworfene Alternativen (WARP, Service-Token, Bypass nur für API-Pfade). Kopf, Zweck, E.2, Stolperstein 6 und Definition of Done Punkt 9 angepasst.
+- **Einladungssperre (B.3, Punkt 10):** Auslöser „Access-Gate entfernt" gestrichen; es bleibt bei Ricos ursprünglicher Regel — wieder aktivieren bei mehr als zwei Personen oder geöffneter Registrierung.
+- **E.4:** Beitritt per Einladungslink erzeugt nur eine Beitrittsanfrage, die der Besitzer annehmen muss (Befund 04.11.2026).
+- **Stolperstein 10 (neu):** „Passwort ändern" und „E-Mail verifizieren" brauchen SMTP; Weg über den Reset-Link im Admin-Panel. E.1 Punkt 4 korrigiert (Partner kann das Passwort nicht selbst im Profil ändern). „Bewusst zurückgestellt" Punkt 2 ergänzt.
+- **„Bewusst zurückgestellt" Punkt 3:** native Apps erledigt; Betriebshinweis zur Client-Kompatibilität.
+- **Stolperstein 11 (neu):** „Allow + Everyone" ist kein Bypass; Policies aus der Policy-Liste müssen der Application zugeordnet sein. Ergebnisse der Tests von außen eingetragen (AFFiNE `200`/`/info`/`101`, Paperless weiterhin `302`).
+- **E.4 erledigt, Definition of Done Punkt 11 ✅:** Beitrittsanfrage angenommen, Mitgliedschaft pro Workspace belegt; Prüfabfrage pro Workspace statt Summe über alle.
 
 **1.2 (01.11.2026)** — Erkenntnisse aus Abend 8 (Teil F live). Damit sind alle acht Abende durchlaufen; offen sind nur E.4/E.5 (nach Ricos Dienstreise) und der erste AFFiNE-Pull-Request von Renovate.
 - **F.1 aufgeteilt nach Rollen:** Ausgangslage und Warten mit `kubectl wait … --timeout=15m` durch Claude Code, `kubectl cnpg backup` durch Rico im eigenen Terminal (legt direkt ein Objekt an → Harte Regel 1). Neue Prüfung: Liegt das letzte Base-Backup vor der Anlage der Datenbank, ist sie bis dahin nur WAL-gesichert. Ergebnis eingetragen (`pantheon-pg-20261101181813` `completed`).
