@@ -4,7 +4,7 @@
 >
 > Bewusst schlank: Alles, was die Nutzung verhindern oder stark einschränken würde, ist drin. Komfort- und Härtungsthemen stehen gesammelt unter **„Bewusst zurückgestellt"** — jeweils mit dem Risiko, das man bis dahin trägt.
 
-*Rezeptversion: 1.3 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
+*Rezeptversion: 1.3.1 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
 
 > **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B und C am 01.11.2026 mit dem Rollout live verifiziert, Teil D am 01.11.2026, Teil E teilweise (E.1–E.3 und Einladungslink am 01.11.2026, E.4 Beitritt per Link am 04.11.2026; E.5 offen). Teil F am 01.11.2026 live verifiziert (erster Renovate-Pull-Request für AFFiNE steht noch aus). Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
 
@@ -159,7 +159,7 @@ Acht Abende à etwa 30 Minuten. Nach jedem Abend kann man aufhören: Die Manifes
 > - **Abgrenzung:** Paperless bleibt hinter Access mit OTP — Schutzbedarf der Dokumente.
 > - **Rücknahme:** Policy `affine-bypass` löschen → Access mit OTP greift sofort wieder (Browser ja, Apps dann nicht mehr).
 > - **Neu bewerten, wenn** mehr als zwei Personen AFFiNE nutzen, sensiblere Inhalte dort landen oder die Registrierung geöffnet wird. Dann zugleich die Einladungssperre (B.3, `newAccountShareActionDelay`) wieder aktivieren.
-> - **Ergebnis 04.11.2026** (von außen, ohne Anmeldung): `curl -sI https://affine.rm-it.org/` → `HTTP/2 200`; `/info` → `{"compatibility":"0.27.4","message":"AFFiNE 0.27.4 Server","type":"selfhosted","flavor":"allinone"}`; WebSocket-Upgrade auf `/socket.io/?EIO=4&transport=websocket` → `101`. Gegenprobe Paperless: weiterhin `HTTP/2 302` auf `rm-it.cloudflareaccess.com`. Native Apps: Bestätigung durch Rico steht noch aus.
+> - **Ergebnis 04.11.2026** (von außen, ohne Anmeldung): `curl -sI https://affine.rm-it.org/` → `HTTP/2 200`; `/info` → `{"compatibility":"0.27.4","message":"AFFiNE 0.27.4 Server","type":"selfhosted","flavor":"allinone"}`; WebSocket-Upgrade auf `/socket.io/?EIO=4&transport=websocket` → `101`. Gegenprobe Paperless: weiterhin `HTTP/2 302` auf `rm-it.cloudflareaccess.com`. Native Apps: iPhone-App am 08.11.2026 erfolgreich mit dem Server verbunden und angemeldet (Weg siehe E.6); macOS-Desktop-App noch nicht bestätigt.
 > - **Verworfene Alternativen:** *Cloudflare-Client (WARP) mit „WARP authentication identity"* auf jedem Gerät — voller Schutz, aber zusätzliche Software auf jedem Gerät, auch beim Geschäftspartner, und standardmäßig dessen gesamter Internetverkehr über Cloudflare. *Service-Token* — scheidet aus, weil die AFFiNE-Apps keine eigenen Header (`CF-Access-Client-Id`) senden können. *Bypass nur für API-Pfade* — bringt praktisch nichts, weil die Weboberfläche dieselben Schnittstellen nutzt.
 
 > **⚠️ Stolperstein 11 — „Allow + Everyone" ist kein Bypass.** Bei Cloudflare Access heißt **Allow** mit Include **Everyone**: Jeder darf rein, *nachdem* er sich angemeldet hat — die OTP-Abfrage bleibt, und jede beliebige E-Mail-Adresse kommt per OTP durch. Nur die Action **Bypass** schaltet die Anmeldung ab. Zweite Falle der aktuellen Oberfläche: Policies, die in der **Policy-Liste** angelegt werden, gelten erst, wenn sie der **Application zugeordnet** sind (Application → Policies → vorhandene Policy auswählen → an erste Stelle → Application speichern).
@@ -1064,6 +1064,23 @@ Beide Wege funktionieren ohne Mailversand. Free-Self-Hosting erlaubt bis zu 10 M
 
 ---
 
+## E.6 — Native Apps verbinden
+
+Voraussetzung: Access für AFFiNE per Bypass gelockert (ADR 4, Nachtrag). Apps: macOS/Windows über [affine.pro/download](https://affine.pro/download), iPhone/iPad über den App Store, Android über den Play Store.
+
+1. App öffnen, oben auf den **Namen des aktuellen Workspace** tippen → die Workspace-Liste öffnet sich (Workspace-Wechsler).
+2. Dort das **Server-Symbol** bzw. „Server hinzufügen" wählen, `https://affine.rm-it.org` eintragen → **Verbinden**.
+3. Mit dem **Konto vom eigenen Server** anmelden (E-Mail und Passwort aus Pantheon).
+4. In der Workspace-Liste erscheint der Server „Pantheon Whiteboard" mit den freigegebenen Workspaces.
+
+> **⚠️ Stolperstein 12 — der Server steht nicht in den Einstellungen.** In der iPhone-App gibt es unter *Einstellungen* keinen Eintrag für einen eigenen Server; die Auswahl liegt ausschließlich im **Workspace-Wechsler** (Befund 08.11.2026). Wer sich stattdessen auf dem Startbildschirm der App anmeldet, landet bei der **AFFiNE-Cloud** des Herstellers — ein separates Konto, dessen Workspaces nicht in Pantheon und damit nicht im Backup liegen. Dort nichts anlegen; bei Bedarf abmelden.
+
+> **Bekannter Fehler (Upstream, Stand 08.11.2026):** Seit der iOS-App 0.26.5 melden Nutzer, dass die Anmeldung an selbst gehosteten Servern scheitert („Failed to sign in", `undefined is not an object (evaluating 'e.password')`, oder der Anmelde-Knopf reagiert nicht) — auch bei Servern, die im Browser und in der Desktop-App laufen ([#15169](https://github.com/toeverything/AFFiNE/issues/15169), [#15160](https://github.com/toeverything/AFFiNE/issues/15160)). Bei Pantheon trat das am 08.11.2026 **nicht** auf. Falls doch: App-Version notieren; Ausweichweg ist `https://affine.rm-it.org` in Safari → Teilen → **„Zum Home-Bildschirm"** (Weboberfläche mit App-Symbol, voll funktionsfähig).
+
+> **Ergebnis 08.11.2026:** iPhone-App über den Workspace-Wechsler mit `https://affine.rm-it.org` verbunden, Anmeldung erfolgreich (Rico). macOS-Desktop-App und Franz' Geräte noch nicht bestätigt.
+
+---
+
 # Teil F — Betrieb: Backup und Updates (Abend 8) *[Claude Code; Backup-Auslösung: Rico im eigenen Terminal]* — ✅ 01.11.2026
 
 ## F.1 — Was ist wo gesichert?
@@ -1186,6 +1203,11 @@ Jeder Punkt mit dem Risiko, das bis zur Umsetzung besteht. Reihenfolge = empfohl
 ---
 
 ## Rezept-Changelog
+
+**1.3.1 (08.11.2026)** — iPhone-App verbunden.
+- **E.6 (neu): Native Apps verbinden** — Weg über den Workspace-Wechsler, Ergebnis eingetragen (iPhone ✅, macOS offen).
+- **Stolperstein 12 (neu):** Server-Auswahl nur im Workspace-Wechsler, nicht in den Einstellungen; Anmeldung auf dem Startbildschirm führt zur AFFiNE-Cloud. Bekannter Upstream-Fehler bei der iOS-Anmeldung an selbst gehosteten Servern samt Ausweichweg dokumentiert.
+- **ADR 4, Nachtrag:** Ergebnis zu den nativen Apps nachgetragen.
 
 **1.3 (04.11.2026)** — Native Apps, Beitritt per Link, Passwortwechsel ohne SMTP.
 - **ADR 4, Nachtrag:** Access für AFFiNE per Bypass-Policy `affine-bypass` gelockert (Entscheidung Rico), damit die nativen Apps funktionieren. Begründung, verbleibender Schutz, Abgrenzung zu Paperless, Rücknahme, Auslöser zur Neubewertung und verworfene Alternativen (WARP, Service-Token, Bypass nur für API-Pfade). Kopf, Zweck, E.2, Stolperstein 6 und Definition of Done Punkt 9 angepasst.
