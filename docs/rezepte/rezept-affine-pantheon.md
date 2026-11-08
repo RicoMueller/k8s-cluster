@@ -4,9 +4,9 @@
 >
 > Bewusst schlank: Alles, was die Nutzung verhindern oder stark einschränken würde, ist drin. Komfort- und Härtungsthemen stehen gesammelt unter **„Bewusst zurückgestellt"** — jeweils mit dem Risiko, das man bis dahin trägt.
 
-*Rezeptversion: 1.3.1 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
+*Rezeptversion: 1.4 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
 
-> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B und C am 01.11.2026 mit dem Rollout live verifiziert, Teil D am 01.11.2026, Teil E teilweise (E.1–E.3 und Einladungslink am 01.11.2026, E.4 Beitritt per Link am 04.11.2026; E.5 offen). Teil F am 01.11.2026 live verifiziert (erster Renovate-Pull-Request für AFFiNE steht noch aus). Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
+> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B und C am 01.11.2026 mit dem Rollout live verifiziert, Teil D am 01.11.2026, Teil E am 08.11.2026 abgeschlossen (E.1–E.3 und Einladungslink am 01.11.2026, E.4 Beitritt per Link am 04.11.2026, E.5 Live-Test und E.6 native Apps am 08.11.2026). **Rezept am 08.11.2026 abgeschlossen**; offen ist nur noch der erste Renovate-Pull-Request für AFFiNE (F.2) und die Punkte unter „Bewusst zurückgestellt". Teil F am 01.11.2026 live verifiziert (erster Renovate-Pull-Request für AFFiNE steht noch aus). Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
 
 > **Umsetzung mit Claude Code.** Dieses Rezept ist so geschrieben, dass Claude Code (VS Code, Repo `~/k8s-cluster`, Leitplanken in `CLAUDE.md` und `.claude/settings.json`) alle Manifeste anlegt, prüft und committet. Rico greift nur an den mit **[Rico]** markierten Stellen ein: Secrets erzeugen und verschlüsseln, `git push` freigeben, Weboberflächen (Omni-Anmeldung, Cloudflare, AFFiNE-Admin). Alles mit **[Claude Code]** markierte erledigt Claude Code selbständig.
 
@@ -50,7 +50,7 @@ Acht Abende à etwa 30 Minuten. Nach jedem Abend kann man aufhören: Die Manifes
 | 4 ✅ 01.11. | Deployment, Service, Route, lokale Kustomization, Renovate-Regel | B.6–B.9 | Push freigeben | Manifeste, Build-Check, Commit | keine |
 | 5 ✅ 01.11. | Flux-Kustomization `apps-affine`, Rollout, Migrationslog, `/info` | Teil C | Push freigeben, ggf. Omni-Anmeldung | Datei anlegen, Commit, Verifikation | AFFiNE läuft intern |
 | 6 ✅ 01.11. | Access-Application, DNS-Eintrag, Admin-Konto — **ohne Pause dazwischen** | Teil D | Cloudflare-Dashboard, `cloudflared`-CLI, Admin anlegen | Gegenproben | extern erreichbar |
-| 7 ◐ teilweise | Partner-Konto, Workspace, Live-Test — E.1–E.3 ✅ 01.11., Einladungssperre per Variante B behoben (Stolperstein 9); **E.4/E.5 offen**, nachholen nach Ricos Dienstreise | Teil E | AFFiNE-Admin, Access-Policy, Test | Datenbank-Gegenprobe | Partner arbeitet mit |
+| 7 ✅ 08.11. | Partner-Konto, Workspace, Live-Test — E.1–E.3 ✅ 01.11., Einladungssperre per Variante B behoben (Stolperstein 9); E.4 ✅ 04.11.; E.5 und E.6 ✅ 08.11. | Teil E | AFFiNE-Admin, Access-Policy, Test | Datenbank-Gegenprobe | Partner arbeitet mit |
 | 8 ✅ 01.11. | Backup-Nachweis, Update-Regeln, Rezept fortschreiben | Teil F | On-Demand-Backup freigeben | Verifikation, Rezeptversion 1.2 | — |
 
 **Gesamtaufwand:** ≈ 3 h reine Arbeitszeit.
@@ -984,6 +984,12 @@ kubectl cnpg psql pantheon-pg -n databases -- -d affine -tAc \
 > **Passwort vergessen ohne SMTP:** Admin-Panel → Accounts → Menü am User → **Reset Password** zeigt einen Reset-Link zum manuellen Weitergeben.
 
 > **⚠️ Stolperstein 10 — Passwort ändern und E-Mail verifizieren brauchen SMTP.** In AFFiNE laufen „Passwort ändern" und „E-Mail verifizieren" (Kontoeinstellungen) über einen Link per Mail. Ohne SMTP scheitert der Versand mit „Der Bestätigungslink konnte nicht gesendet werden" (Befund 04.11.2026, Geschäftspartner). **Weg:** Admin-Panel → Accounts → Menü am User → **Reset Password** → den angezeigten Link über einen sicheren Kanal weitergeben (wie ein Passwort behandeln); der Nutzer setzt sein Passwort darüber selbst, höchstens 32 Zeichen. „E-Mail verifizieren" ist unkritisch, weil `auth.requireEmailVerification: false` gesetzt ist. In der Anleitung für neue Nutzer darauf hinweisen.
+>
+> **Eigenschaften des Reset-Links** (Quellcode 0.27.4, `createChangePasswordUrl` / `changePassword` / `verification-token.ts`): **30 Minuten** gültig, **einmal** verwendbar, an das **Konto** gebunden (Parameter `userId` und `token`), nicht an eine Anmeldung — die Mutation `changePassword` ist öffentlich. Nach dem Wechsel beendet AFFiNE **alle Sitzungen** des Kontos (`changePasswordAndRevokeSessions`), auch in den Apps; der Nutzer meldet sich überall neu an, der Server bleibt in den Apps eingetragen.
+>
+> **Passwort hart neu vergeben (Admin):** Ein Admin-Panel-Feld „Passwort setzen" gibt es nicht (`ManageUserInput` kennt nur Name und E-Mail). Stattdessen: Reset-Link erzeugen und **sofort selbst** in einem privaten Browserfenster öffnen, das neue Passwort setzen (höchstens 32 Zeichen) und es dem Nutzer über einen sicheren Kanal geben. Kein Eingriff in die Datenbank nötig.
+>
+> **Befund 08.11.2026:** Der an Franz geschickte Reset-Link funktionierte nicht (wahrscheinlich abgelaufen, schon verbraucht oder vom Messenger beschädigt — nicht weiter untersucht). Der Weg „Admin setzt das Passwort über einen frischen Link selbst" war erfolgreich.
 
 ## E.2 — Partner in Access freischalten
 
@@ -1062,11 +1068,16 @@ Beide Wege funktionieren ohne Mailversand. Free-Self-Hosting erlaubt bis zu 10 M
 
 > **⚠️ Stolperstein 6 — Access-Session läuft ab.** *(Entfällt seit 04.11.2026 durch den Bypass, ADR 4; gilt wieder, wenn der Bypass zurückgenommen wird.)* Endet die Cloudflare-Access-Session während der Arbeit, kann der WebSocket nicht neu verbinden (kein gültiges Access-Cookie) — die Seite lädt neu und fragt das OTP ab. Nichts geht verloren (AFFiNE puffert lokal), aber die Session-Dauer in D.1 nicht zu kurz wählen.
 
+> **Ergebnis 08.11.2026:** Live-Test mit Franz erfolgreich — nach Ricos Rückmeldung haben alle offenen Tests funktioniert (gemeinsames Arbeiten im Workspace `a60b8545`). Einzelwerte (Latenz, Bild-Test, WebSocket im Browser) nicht gesondert festgehalten; der WebSocket-Upgrade (`101`) ist seit 04.11.2026 von außen belegt (ADR 4, Nachtrag).
+
 ---
 
 ## E.6 — Native Apps verbinden
 
-Voraussetzung: Access für AFFiNE per Bypass gelockert (ADR 4, Nachtrag). Apps: macOS/Windows über [affine.pro/download](https://affine.pro/download), iPhone/iPad über den App Store, Android über den Play Store.
+Voraussetzung: Access für AFFiNE per Bypass gelockert (ADR 4, Nachtrag). Bezugsquellen:
+- **macOS:** nicht im Mac App Store. `brew install --cask affine` (Homebrew-Cask, stabile Version, Apple Silicon und Intel) oder Download von [affine.pro/download](https://affine.pro/download). Die Desktop-App **aktualisiert sich selbst**, unabhängig von Homebrew und vom Server — siehe Betriebshinweis zur Client-Kompatibilität („Bewusst zurückgestellt", Punkt 3).
+- **Windows:** [affine.pro/download](https://affine.pro/download).
+- **iPhone/iPad:** App Store. **Android:** Play Store.
 
 1. App öffnen, oben auf den **Namen des aktuellen Workspace** tippen → die Workspace-Liste öffnet sich (Workspace-Wechsler).
 2. Dort das **Server-Symbol** bzw. „Server hinzufügen" wählen, `https://affine.rm-it.org` eintragen → **Verbinden**.
@@ -1077,7 +1088,7 @@ Voraussetzung: Access für AFFiNE per Bypass gelockert (ADR 4, Nachtrag). Apps: 
 
 > **Bekannter Fehler (Upstream, Stand 08.11.2026):** Seit der iOS-App 0.26.5 melden Nutzer, dass die Anmeldung an selbst gehosteten Servern scheitert („Failed to sign in", `undefined is not an object (evaluating 'e.password')`, oder der Anmelde-Knopf reagiert nicht) — auch bei Servern, die im Browser und in der Desktop-App laufen ([#15169](https://github.com/toeverything/AFFiNE/issues/15169), [#15160](https://github.com/toeverything/AFFiNE/issues/15160)). Bei Pantheon trat das am 08.11.2026 **nicht** auf. Falls doch: App-Version notieren; Ausweichweg ist `https://affine.rm-it.org` in Safari → Teilen → **„Zum Home-Bildschirm"** (Weboberfläche mit App-Symbol, voll funktionsfähig).
 
-> **Ergebnis 08.11.2026:** iPhone-App über den Workspace-Wechsler mit `https://affine.rm-it.org` verbunden, Anmeldung erfolgreich (Rico). macOS-Desktop-App und Franz' Geräte noch nicht bestätigt.
+> **Ergebnis 08.11.2026:** iPhone-App über den Workspace-Wechsler mit `https://affine.rm-it.org` verbunden, Anmeldung erfolgreich (Rico). Danach nach Ricos Rückmeldung alle offenen Tests erfolgreich, einschließlich der Geräte von Franz. Installationsweg der macOS-App (Homebrew oder Download) nicht festgehalten.
 
 ---
 
@@ -1178,7 +1189,7 @@ kubectl get backup $B -n databases -o jsonpath='{.status.phase} {.status.started
 | 9 | Admin hinter Access angelegt | Access-App vor DNS, Admin-Setup erledigt (D.1–D.3); Access seit 04.11.2026 per Bypass gelockert (ADR 4, Nachtrag) |
 | 10 | Registrierung geschlossen | Gegenprobe D.4 |
 | 11 | Partner kann mitarbeiten | Konto importiert, Workspace-Mitglied (E.1–E.4) — ✅ 04.11.2026 (`a60b8545`: Rico `owner`, Franz `member`, beide `active`) |
-| 12 | Live-Kollaboration | E.5 grün, WebSocket `101` — **offen** (nach Ricos Dienstreise) |
+| 12 | Live-Kollaboration | E.5 grün, WebSocket `101` — ✅ 08.11.2026 (Live-Test mit Franz; WebSocket `101` von außen belegt 04.11.) |
 | 13 | DB im Backup verifiziert | On-Demand-Backup `completed` nach Anlage der DB (F.1) — ✅ 01.11. (`pantheon-pg-20261101181813`) |
 | 14 | Update-Weg definiert | F.2, erster Renovate-PR bewusst geprüft — **offen**: Weg definiert, Renovate läuft; erster AFFiNE-Pull-Request steht noch aus |
 
@@ -1203,6 +1214,12 @@ Jeder Punkt mit dem Risiko, das bis zur Umsetzung besteht. Reihenfolge = empfohl
 ---
 
 ## Rezept-Changelog
+
+**1.4 (08.11.2026)** — Rezept abgeschlossen.
+- **E.5 erledigt, Definition of Done Punkt 12 ✅:** Live-Test mit Franz erfolgreich; Abend 7 in der Abendtabelle auf ✅.
+- **E.6:** Bezugsquellen ergänzt — macOS-App nicht im Mac App Store, sondern Homebrew-Cask `affine` oder Download; Hinweis auf die Selbstaktualisierung der Desktop-App. Ergebnis: alle Geräte verbunden.
+- **Stolperstein 10 erweitert:** Reset-Link 30 Minuten gültig, einmal verwendbar, an das Konto gebunden, beendet alle Sitzungen. Weg „Admin setzt das Passwort über einen frischen Link selbst" dokumentiert (kein Admin-Feld zum Setzen, kein Datenbank-Eingriff); Befund vom 08.11.2026.
+- **Status:** Rezept abgeschlossen; offen bleiben der erste Renovate-Pull-Request für AFFiNE und „Bewusst zurückgestellt".
 
 **1.3.1 (08.11.2026)** — iPhone-App verbunden.
 - **E.6 (neu): Native Apps verbinden** — Weg über den Workspace-Wechsler, Ergebnis eingetragen (iPhone ✅, macOS offen).
