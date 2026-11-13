@@ -4,7 +4,7 @@
 >
 > Bewusst schlank: Alles, was die Nutzung verhindern oder stark einschränken würde, ist drin. Komfort- und Härtungsthemen stehen gesammelt unter **„Bewusst zurückgestellt"** — jeweils mit dem Risiko, das man bis dahin trägt.
 
-*Rezeptversion: 1.5 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
+*Rezeptversion: 1.5.1 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
 
 > **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B und C am 01.11.2026 mit dem Rollout live verifiziert, Teil D am 01.11.2026, Teil E am 08.11.2026 abgeschlossen (E.1–E.3 und Einladungslink am 01.11.2026, E.4 Beitritt per Link am 04.11.2026, E.5 Live-Test und E.6 native Apps am 08.11.2026). **Rezept am 08.11.2026 abgeschlossen**; offen ist nur noch der erste Renovate-Pull-Request für AFFiNE (F.2) und die Punkte unter „Bewusst zurückgestellt". Teil F am 01.11.2026 live verifiziert (erster Renovate-Pull-Request für AFFiNE steht noch aus). **Teil G (Systemmails über IONOS) am 12.11.2026 ergänzt, noch nicht live verifiziert** — Postfach `noreply@rm-it.org` ist bei IONOS angelegt, Weiterleitung an Ricos private Adresse aktiv. Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
 
@@ -1232,6 +1232,8 @@ done
 
 Ergebnis an Rico melden, mit der Liste der Einträge, die in G.2 anzulegen sind.
 
+> **Ergebnis 13.11.2026:** NS `cecelia.ns.cloudflare.com`, `chip.ns.cloudflare.com` → Zone bei Cloudflare. MX leer (`NOERROR`, keine Antwort), `rm-it.org` hat überhaupt keine TXT-Einträge (kein SPF), `_dmarc` und alle drei DKIM-Namen `NXDOMAIN`. Gegenprobe über `@8.8.8.8` identisch — kein Timeout, die Einträge fehlen wirklich. Folge für G.2: alle vier Schritte, zusammen 7 Einträge (SPF neu, 3 DKIM-CNAMEs, 2 MX, DMARC).
+
 ## G.2 — DNS-Einträge bei Cloudflare *[Rico]*
 
 **Cloudflare-Dashboard → Account → `rm-it.org` → DNS → Records → Add record.** Nur die Einträge anlegen, die G.1 als fehlend gemeldet hat.
@@ -1268,12 +1270,15 @@ dig +short TXT rm-it.org @1.1.1.1 | grep -c 'v=spf1'
 # Erwartung: 1 (genau ein SPF-Eintrag)
 ```
 
+> **Ergebnis 13.11.2026:** Rico hat alle 7 Einträge angelegt. G.1 erneut: MX `10 mx00.ionos.de`, `10 mx01.ionos.de`; SPF `v=spf1 include:_spf-eu.ionos.com ~all`, `grep -c` = 1; DMARC `v=DMARC1; p=none`; DKIM-CNAMEs `s1-ionos` → `s1.dkim.ionos.com`, `s2-ionos` → `s2.dkim.ionos.com`, `s42582890` → `s42582890.dkim.ionos.com`. Alle CNAMEs liefern das IONOS-Ziel statt Cloudflare-Adressen → DNS only, Stolperstein 13 nicht aufgetreten. DKIM-TXT über `s1-ionos._domainkey` → `v=DKIM1; p=MIIBIjANBgkqhkiG…`, über `s2-ionos` ebenso.
+> - **`s42582890` — Abweichung, bewusst belassen:** Der Selektor steht in der IONOS-DNS-Vorlage für `rm-it.org`, ist also kontospezifisch und richtig. Das Ziel `s42582890.dkim.ionos.com` löst (noch) nicht auf (`NXDOMAIN` über `1.1.1.1` und `8.8.8.8`); `s1`/`s2` haben Schlüssel. Der Eintrag bleibt bewusst stehen (Entscheidung Rico, 13.11.2026). G.3 zeigt im `DKIM-Signature`-Header (`s=`), mit welchem Selektor IONOS tatsächlich signiert.
+
 ## G.3 — SMTP-Zugang außerhalb des Clusters beweisen *[Rico, im eigenen Terminal]*
 
 Dieser Test **nicht** in Claude Code ausführen — er fragt das Postfach-Passwort ab. `curl` fragt es interaktiv ab, wenn hinter `--user` kein Passwort steht; es landet weder in der Shell-History noch in einer Datei.
 
 ```bash
-read -rp "Empfänger (private Adresse): " TO
+printf "Empfänger (private Adresse): "; read -r TO
 cat > /tmp/smtp-test.eml <<EOF
 From: Pantheon Whiteboard <noreply@rm-it.org>
 To: <${TO}>
@@ -1309,29 +1314,38 @@ Fehlt eines davon, kurz warten (DNS-Verbreitung) und den Test wiederholen; bleib
 
 Danach in Claude Code: „SMTP-Test erfolgreich, SPF und DKIM pass, weiter mit G.4."
 
+> **Ergebnis 13.11.2026 13:28 (Rico):** `SMTP_OK`, Mail an der privaten Adresse angekommen, ausgeliefert über `mout.kundenserver.de` (IONOS-Ausgang). `Authentication-Results`: `spf=pass`, `dmarc=pass`; `X-Spam-Flag: NO`. Weiterleitung geprüft: Antwort an `noreply@rm-it.org` kam über die IONOS-Weiterleitung an der privaten Adresse an (MX aus G.2 wirkt).
+> - **⚠️ Offen — DKIM, Neuprüfung nach 24 h:** `dkim=none`, im Header **keine** `DKIM-Signature` — IONOS signiert für `rm-it.org` noch nicht (passt zum nicht auflösenden Selektor `s42582890` in G.2). Kein Fehler in den Cloudflare-Einträgen; `dmarc=pass` kommt über das SPF-Alignment. G.3 nach 24 h wiederholen; bleibt es bei `dkim=none` → „Bewusst zurückgestellt", Punkt 13.
+
 ## G.4 — Secret erzeugen und verschlüsseln *[Rico, im eigenen Terminal]*
 
 Wie A.1: **nicht** von Claude Code ausführen lassen. `kubectl create secret … --dry-run=client` spricht nicht mit dem Cluster; es übernimmt das Maskieren, sodass Sonderzeichen im Passwort (`#`, `:`, `"`, `'`, `$`) kein YAML zerbrechen.
 
+Der Block läuft als Subshell in runden Klammern: `umask 077`, `F` und das Passwort `P` bleiben nicht in der interaktiven Shell zurück, auch wenn ein Schritt abbricht.
+
 ```bash
-cd ~/k8s-cluster
+(
+cd ~/k8s-cluster || exit 1
 F=apps/pantheon/affine/affine-smtp-secret.yaml
 test -e "$F" && { echo "ABBRUCH: $F existiert schon"; } || {
   umask 077
-  read -rsp "Passwort noreply@rm-it.org: " P; echo
+  printf "Passwort noreply@rm-it.org: "; read -rs P; echo
   kubectl create secret generic affine-smtp -n affine \
     --from-literal=mailer-password="$P" --dry-run=client -o yaml > "$F"
   unset P
   sops --encrypt --in-place "$F" || { rm -f "$F"; echo "ABBRUCH: sops fehlgeschlagen, Datei entfernt"; }
 }
 grep -c 'ENC\[' "$F"
-grep -E '^\s+mailer-password:' "$F"
+grep -E '^[[:space:]]+mailer-password:' "$F"
+)
 # Erwartung: Zähler >= 2; die Zeile mailer-password beginnt mit ENC[ — kein Klartext
 ```
 
 > Die Datei enthält das Passwort nur als `data` (Base64) und nur bis zum `sops`-Aufruf unverschlüsselt. Fehlt `ENC[` in der Zeile `mailer-password`, greift die Regel in `.sops.yaml` für diesen Pfad nicht → Datei löschen, `.sops.yaml` prüfen, nicht committen.
 
 Danach in Claude Code: „SMTP-Secret für AFFiNE liegt bereit, weiter mit G.5."
+
+> **Ergebnis 13.11.2026:** `apps/pantheon/affine/affine-smtp-secret.yaml` von Rico erzeugt und verschlüsselt. Eingangsprüfung aus G.5 durch Claude Code: 2 Zeilen mit `ENC[`, `mailer-password` verschlüsselt, `name: affine-smtp` vorhanden, keine Klartextzeile unter `data`.
 
 ## G.5 — Mailer-Variablen, Kustomization, Rollout *[Claude Code; Push: Rico gibt frei]*
 
@@ -1483,10 +1497,16 @@ Jeder Punkt mit dem Risiko, das bis zur Umsetzung besteht. Reihenfolge = empfohl
 10. **Einladungssperre für neue Konten wieder aktivieren, sobald mehr als zwei Personen AFFiNE nutzen.** *Risiko:* Mit `auth.newAccountShareActionDelay: 0` (B.3, Stolperstein 9) kann jedes Konto ab der ersten Minute Einladungs- und Share-Links erzeugen. Bei geschlossener Registrierung und zwei bekannten Personen vertretbar. Hinter Access gelockert (seit 04.11.2026) weiterhin vertretbar, weil neue Konten nur der Admin anlegt. *Auslöser:* mehr als zwei Personen oder Registrierung geöffnet → Eintrag entfernen (Default `86400` s) oder passenden Wert setzen.
 11. **Blob-PVC gegen Löschen absichern (gemeinsam mit Paperless).** *Risiko:* Das PV von `affine-storage` hat `reclaimPolicy: Delete` (StorageClass `qnap-iscsi`), `apps-affine` läuft mit `prune: true`. Fliegt `pvc.yaml` aus der `kustomization.yaml` oder wird `apps-affine` bzw. der Namespace entfernt, löscht Flux die PVC — Bilder und Anhänge wären weg (Whiteboards, Konten und Workspaces liegen in der DB und sind gesichert). Paperless hat dieselbe Lage. *Bewertung:* Die Flux-Annotation `kustomize.toolkit.fluxcd.io/prune: disabled` an der PVC schützt nur vor dem ersten Fall, nicht vor dem Löschen des Namespace; `Retain` ginge nur per direktem Patch am PV oder über eine eigene StorageClass (Shared-Infrastruktur). *Umsetzung später:* als eigenes Vorhaben für beide Apps, zusammen mit Punkt 1. Entscheidung Rico 01.11.2026.
 12. **Mail-Domain zu Proton (Abstimmung mit `claude/rezept-proton-pantheon.md`).** *Risiko:* Zieht `rm-it.org` später zu Proton um, müssen SPF, DKIM und MX in einem Zug umgestellt werden; wird nur der MX geändert, landen Antworten an `noreply@` nicht mehr in der IONOS-Weiterleitung, wird nur SPF ersetzt, scheitert der AFFiNE-Versand über IONOS. *Umsetzung später:* im Proton-Rezept Block D für AFFiNE entweder auf Proton-SMTP umstellen (dann `MAILER_HOST` und Secret tauschen, IONOS-Einträge entfernen) oder IONOS als Versandweg behalten (dann bleibt `include:_spf-eu.ionos.com` im SPF und die IONOS-DKIM-Einträge bleiben stehen).
+13. **DKIM-Signatur durch IONOS nachprüfen.** *Risiko:* Am 13.11.2026 kamen die Testmails ohne `DKIM-Signature` an (`dkim=none`, G.3); der kontospezifische Selektor `s42582890` löst bei IONOS noch nicht auf (G.2). Zustellung läuft über SPF und `dmarc=pass`, aber ohne DKIM steigt das Spam-Risiko bei strengen Empfängern, und `p=quarantine` (Proton-Vorhaben) wäre bei weitergeleiteten Mails riskant. *Vorgehen:* G.3 nach 24 h wiederholen. Bleibt es bei `dkim=none`, im IONOS-Konto bzw. beim IONOS-Support die DKIM-Aktivierung für Domains mit externen Nameservern (Cloudflare) klären.
 
 ---
 
 ## Rezept-Changelog
+
+**1.5.1 (13.11.2026)** — Teil G, Abend 9: G.1–G.4 durchlaufen.
+- **G.1, G.2, G.3, G.4:** Ergebnisse eingetragen (7 DNS-Einträge angelegt, SMTP-Test erfolgreich, Secret bereit).
+- **Korrektur G.3/G.4 (zsh):** `read -rp`/`read -rsp` funktionieren in zsh nicht → `printf "…: "; read -r TO` bzw. `printf "…: "; read -rs P; echo`. G.4 läuft als Subshell in runden Klammern; `\s` in `grep -E` durch `[[:space:]]` ersetzt (POSIX, unabhängig von der grep-Variante).
+- **Abweichung DKIM:** Selektor `s42582890` aus der IONOS-DNS-Vorlage löst noch nicht auf, IONOS signiert noch nicht (`dkim=none`). CNAME bleibt bewusst stehen (Entscheidung Rico); Nachprüfung als „Bewusst zurückgestellt", Punkt 13.
 
 **1.5 (12.11.2026)** — Systemmails über IONOS.
 - **ADR 5 (neu):** Inklusivpostfach `noreply@rm-it.org` aus dem IONOS-Domainvertrag als Absender, Versand über `smtp.ionos.de:587` (STARTTLS), Passwort als SOPS-Secret `affine-smtp`, Konfiguration über `MAILER_*`; SPF/DKIM in der Cloudflare-Zone. Verhältnis zum Proton-Rezept und verworfene Alternativen dokumentiert. Entscheidung Rico.
