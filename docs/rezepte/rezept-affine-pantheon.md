@@ -4,9 +4,9 @@
 >
 > Bewusst schlank: Alles, was die Nutzung verhindern oder stark einschränken würde, ist drin. Komfort- und Härtungsthemen stehen gesammelt unter **„Bewusst zurückgestellt"** — jeweils mit dem Risiko, das man bis dahin trägt.
 
-*Rezeptversion: 1.5.1 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
+*Rezeptversion: 1.5.2 — November 2026 · Cluster: Pantheon · Zielversion: AFFiNE 0.27.4*
 
-> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B und C am 01.11.2026 mit dem Rollout live verifiziert, Teil D am 01.11.2026, Teil E am 08.11.2026 abgeschlossen (E.1–E.3 und Einladungslink am 01.11.2026, E.4 Beitritt per Link am 04.11.2026, E.5 Live-Test und E.6 native Apps am 08.11.2026). **Rezept am 08.11.2026 abgeschlossen**; offen ist nur noch der erste Renovate-Pull-Request für AFFiNE (F.2) und die Punkte unter „Bewusst zurückgestellt". Teil F am 01.11.2026 live verifiziert (erster Renovate-Pull-Request für AFFiNE steht noch aus). **Teil G (Systemmails über IONOS) am 12.11.2026 ergänzt, noch nicht live verifiziert** — Postfach `noreply@rm-it.org` ist bei IONOS angelegt, Weiterleitung an Ricos private Adresse aktiv. Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
+> **Status:** Teil 0 am 27.10.2026 und Teil A am 01.11.2026 live verifiziert (Ergebnisse jeweils im Teil eingetragen). Teile B und C am 01.11.2026 mit dem Rollout live verifiziert, Teil D am 01.11.2026, Teil E am 08.11.2026 abgeschlossen (E.1–E.3 und Einladungslink am 01.11.2026, E.4 Beitritt per Link am 04.11.2026, E.5 Live-Test und E.6 native Apps am 08.11.2026). **Rezept am 08.11.2026 abgeschlossen**; offen ist nur noch der erste Renovate-Pull-Request für AFFiNE (F.2) und die Punkte unter „Bewusst zurückgestellt". Teil F am 01.11.2026 live verifiziert (erster Renovate-Pull-Request für AFFiNE steht noch aus). **Teil G (Systemmails über IONOS) am 12.11.2026 ergänzt und am 13.11.2026 live verifiziert** (G.1–G.6; SPF, DKIM mit `s1-ionos` und DMARC `pass`, Verifikationsmail aus AFFiNE angekommen). Alle Annahmen sind gegen den AFFiNE-Quellcode (Tag `v0.27.4`: `self-host-predeploy.js`, `prelude.ts`, Setup-Controller, Config-Module) und die CNPG-1.30-Doku geprüft. Nach jedem Abend die Erwartungswerte mit den echten Ausgaben abgleichen und Abweichungen hier nachtragen.
 
 > **Umsetzung mit Claude Code.** Dieses Rezept ist so geschrieben, dass Claude Code (VS Code, Repo `~/k8s-cluster`, Leitplanken in `CLAUDE.md` und `.claude/settings.json`) alle Manifeste anlegt, prüft und committet. Rico greift nur an den mit **[Rico]** markierten Stellen ein: Secrets erzeugen und verschlüsseln, `git push` freigeben, Weboberflächen (Omni-Anmeldung, Cloudflare, AFFiNE-Admin, IONOS). Alles mit **[Claude Code]** markierte erledigt Claude Code selbständig.
 
@@ -54,7 +54,7 @@ Acht Abende à etwa 30 Minuten, seit 1.5 ein neunter für die Systemmails. Nach 
 | 6 ✅ 01.11. | Access-Application, DNS-Eintrag, Admin-Konto — **ohne Pause dazwischen** | Teil D | Cloudflare-Dashboard, `cloudflared`-CLI, Admin anlegen | Gegenproben | extern erreichbar |
 | 7 ✅ 08.11. | Partner-Konto, Workspace, Live-Test — E.1–E.3 ✅ 01.11., Einladungssperre per Variante B behoben (Stolperstein 9); E.4 ✅ 04.11.; E.5 und E.6 ✅ 08.11. | Teil E | AFFiNE-Admin, Access-Policy, Test | Datenbank-Gegenprobe | Partner arbeitet mit |
 | 8 ✅ 01.11. | Backup-Nachweis, Update-Regeln, Rezept fortschreiben | Teil F | On-Demand-Backup freigeben | Verifikation, Rezeptversion 1.2 | — |
-| 9 | Systemmails über IONOS: DNS (SPF, DKIM, ggf. MX), SMTP-Test, Secret, Mailer-Variablen, Funktionstest | Teil G | Cloudflare-DNS, SMTP-Test und Secret im eigenen Terminal, Push freigeben, Funktionstest | DNS-Prüfung, Manifest, Commit, Verifikation | AFFiNE verschickt Mails |
+| 9 ✅ 13.11. | Systemmails über IONOS: DNS (SPF, DKIM, ggf. MX), SMTP-Test, Secret, Mailer-Variablen, Funktionstest | Teil G | Cloudflare-DNS, SMTP-Test und Secret im eigenen Terminal, Push freigeben, Funktionstest | DNS-Prüfung, Manifest, Commit, Verifikation | AFFiNE verschickt Mails |
 
 **Gesamtaufwand:** ≈ 3,5 h reine Arbeitszeit.
 
@@ -1315,7 +1315,7 @@ Fehlt eines davon, kurz warten (DNS-Verbreitung) und den Test wiederholen; bleib
 Danach in Claude Code: „SMTP-Test erfolgreich, SPF und DKIM pass, weiter mit G.4."
 
 > **Ergebnis 13.11.2026 13:28 (Rico):** `SMTP_OK`, Mail an der privaten Adresse angekommen, ausgeliefert über `mout.kundenserver.de` (IONOS-Ausgang). `Authentication-Results`: `spf=pass`, `dmarc=pass`; `X-Spam-Flag: NO`. Weiterleitung geprüft: Antwort an `noreply@rm-it.org` kam über die IONOS-Weiterleitung an der privaten Adresse an (MX aus G.2 wirkt).
-> - **⚠️ Offen — DKIM, Neuprüfung nach 24 h:** `dkim=none`, im Header **keine** `DKIM-Signature` — IONOS signiert für `rm-it.org` noch nicht (passt zum nicht auflösenden Selektor `s42582890` in G.2). Kein Fehler in den Cloudflare-Einträgen; `dmarc=pass` kommt über das SPF-Alignment. G.3 nach 24 h wiederholen; bleibt es bei `dkim=none` → „Bewusst zurückgestellt", Punkt 13.
+> - ~~**⚠️ Offen — DKIM, Neuprüfung nach 24 h:**~~ ✅ **Erledigt 13.11.2026:** Beim SMTP-Test um 13:28 noch `dkim=none`, im Header **keine** `DKIM-Signature` (kein Fehler in den Cloudflare-Einträgen; `dmarc=pass` kam über das SPF-Alignment). Bei der Verifikationsmail aus G.6 um 13:48 `dkim=pass` mit `header.s=s1-ionos` — IONOS signiert seit 13.11.2026 mit `s1-ionos`. Der Selektor `s42582890` wird nicht genutzt; der CNAME bleibt stehen (G.2).
 
 ## G.4 — Secret erzeugen und verschlüsseln *[Rico, im eigenen Terminal]*
 
@@ -1393,8 +1393,8 @@ In `apps/pantheon/affine/kustomization.yaml` direkt nach `affine-secret.yaml` au
 kubectl kustomize apps/pantheon/affine/ > /dev/null && echo BUILD_OK
 kubectl kustomize apps/pantheon/affine/ | grep -c 'name: MAILER_'
 # Erwartung: 6
-kubectl kustomize apps/pantheon/affine/ | grep -A3 'name: MAILER_PASSWORD' | grep -c 'affine-smtp'
-# Erwartung: 1
+kubectl kustomize apps/pantheon/affine/ | grep -A4 'name: MAILER_PASSWORD' | grep -c 'affine-smtp'
+# Erwartung: 1   (-A4: kustomize sortiert key vor name -> name steht in der 4. Zeile)
 
 A=apps/pantheon/affine
 git add "$A/affine-smtp-secret.yaml" "$A/deployment.yaml" "$A/kustomization.yaml"
@@ -1427,6 +1427,10 @@ kubectl logs -n affine deploy/affine -c affine --since=10m | grep -iE 'mail|smtp
 
 Danach an Rico: „Mailer aktiv, weiter mit G.6."
 
+> **Ergebnis 13.11.2026:** Commits `5241f8e` (Rezept) und `8347fe8` (G.5), von Rico gepusht. Eingangsprüfung: 2 × `ENC[`, `mailer-password` verschlüsselt, `name: affine-smtp` vorhanden. Build: `BUILD_OK` mit 10 Ressourcen, 6 × `MAILER_`, nur im Container `affine` (initContainer `migrate`: 0). **Abweichung:** Die Prüfung `grep -A3 … | grep -c 'affine-smtp'` ergab 0 statt 1 — `kubectl kustomize` sortiert `key` vor `name`, `name: affine-smtp` steht in der 4. Zeile; Manifest korrekt, Prüfbefehl auf `-A4` korrigiert (ergibt 1).
+> - **Rollout:** `apps-affine` READY True auf `main@sha1:8347fe8c`; `rollout status` nach gut einer Minute erfolgreich, ohne manuellen Neustart. Pods `affine` und `affine-redis` je `1/1 Running`, 0 Neustarts, kein `CreateContainerConfigError` → Secret `affine-smtp` und Schlüssel `mailer-password` vorhanden.
+> - **Am Pod:** `MAILER_HOST=smtp.ionos.de`, `MAILER_PORT=587`, `MAILER_IGNORE_TLS=false`, `MAILER_USER=noreply@rm-it.org`, `MAILER_SENDER=Pantheon Whiteboard <noreply@rm-it.org>`, `MAILER_PASSWORD gesetzt`. `/info` wie C.3 (`AFFiNE 0.27.4 Server`). Log: `MailModule dependencies initialized`, `MailSender.onConfigInit` verarbeitet; 0 Zeilen mit `EAUTH`, `ECONNECTION`, `ETIMEDOUT` oder `Invalid login`. Migration ohne Fehler (`Done`). Ob der Versand wirklich klappt, zeigt erst G.6.
+
 ## G.6 — Funktionstest *[Rico; Log-Gegenprobe: Claude Code]*
 
 1. **Verifikationsmail (harmlos, ändert nichts):** In AFFiNE im Browser als Rico → Kontoeinstellungen → **E-Mail verifizieren** bzw. „Bestätigungslink senden". **Erwartung:** keine Meldung „Der Bestätigungslink konnte nicht gesendet werden"; Mail von `Pantheon Whiteboard <noreply@rm-it.org>` innerhalb von 1–2 Minuten im Postfach der AFFiNE-Kontoadresse; der Link beginnt mit `https://affine.rm-it.org/` (nicht `localhost` — sonst `server.externalUrl` prüfen, B.3).
@@ -1447,7 +1451,11 @@ Danach an Rico: „Mailer aktiv, weiter mit G.6."
 
 **Rückweg** (falls der Versand Probleme macht und erst später geklärt werden soll): Commit aus G.5 per `git revert` rückgängig machen, Push, Reconcile — AFFiNE läuft wieder ohne SMTP, Flux entfernt das Secret (`prune: true`), Stolperstein 10 gilt wieder. Die DNS-Einträge aus G.2 können stehen bleiben.
 
-> **Ergebnis:** *offen — nach dem Durchlauf hier eintragen (G.1-Befund, angelegte DNS-Einträge, Commit, Header-Werte, Testergebnisse).*
+> **Ergebnis 13.11.2026 13:48 (Rico; Datenbank-Gegenprobe: Claude Code):** G.1–G.5 siehe die Ergebnisse dort (7 DNS-Einträge, SMTP-Test, Secret, Commit `8347fe8`).
+> - **Punkt 1:** Verifikationsmail aus AFFiNE angekommen, Absender `Pantheon Whiteboard <noreply@rm-it.org>`, keine Fehlermeldung in AFFiNE. Der Link führt auf `https://affine.rm-it.org/auth/verify-…`; der Mailanbieter des Empfängers schaltet eine eigene Umleitung davor (`https://www.ui-deref.de/r/?to=…`). Das ist kein AFFiNE-Thema, `server.externalUrl` greift (kein `localhost`). Link angeklickt.
+> - **Punkt 2:** `spf=pass`, `dkim=pass` (`header.s=s1-ionos`), `dmarc=pass`, `X-Spam-Flag: NO`.
+> - **Datenbank-Gegenprobe** (rein lesend, ohne E-Mail-Adressen): `SELECT name, email_verified IS NOT NULL FROM users ORDER BY created_at;` → `Rico|t`, `Franz|f`. `email_verified` für Rico = 13.11.2026 13:48 (Europe/Berlin), also durch diesen Klick gesetzt. Franz unverändert. Unkritisch, weil `auth.requireEmailVerification: false`.
+> - **Punkte 3, 5, 6** (Passwort ändern, E-Mail-Einladung, Franz informieren): nicht Teil dieses Durchlaufs.
 
 ---
 
@@ -1477,7 +1485,7 @@ Danach an Rico: „Mailer aktiv, weiter mit G.6."
 | 12 | Live-Kollaboration | E.5 grün, WebSocket `101` — ✅ 08.11.2026 (Live-Test mit Franz; WebSocket `101` von außen belegt 04.11.) |
 | 13 | DB im Backup verifiziert | On-Demand-Backup `completed` nach Anlage der DB (F.1) — ✅ 01.11. (`pantheon-pg-20261101181813`) |
 | 14 | Update-Weg definiert | F.2, erster Renovate-PR bewusst geprüft — **offen**: Weg definiert, Renovate läuft; erster AFFiNE-Pull-Request steht noch aus |
-| 15 | Systemmails | SPF und DKIM `pass` (G.3), Verifikationsmail aus AFFiNE kommt an, Link zeigt auf `affine.rm-it.org` (G.6) — **offen** |
+| 15 | Systemmails | SPF und DKIM `pass` (G.3), Verifikationsmail aus AFFiNE kommt an, Link zeigt auf `affine.rm-it.org` (G.6) — ✅ 13.11.2026 (`spf`/`dkim`/`dmarc=pass`, DKIM mit `s1-ionos`; Verifikation für Rico in der Datenbank gesetzt) |
 
 ---
 
@@ -1486,7 +1494,7 @@ Danach an Rico: „Mailer aktiv, weiter mit G.6."
 Jeder Punkt mit dem Risiko, das bis zur Umsetzung besteht. Reihenfolge = empfohlene Priorität.
 
 1. **Off-site-Sicherung des Blob-Storage.** *Risiko:* Bilder und Anhänge liegen nur auf der QNAP; ein NAS-Totalausfall ließe die Whiteboards ohne eingefügte Bilder zurück (Formen, Text, Notizen in der DB bleiben erhalten). *Interim:* das iSCSI-LUN von `affine-storage` in die QNAP-Snapshot-Planung aufnehmen. *Umsetzung später:* rclone-CronJob nach dem Muster Paperless E.6 (eigener Storage-Box-Sub-Account, Ziel-Unterverzeichnis statt Wurzel — Stolperstein U, `podAffinity` wegen RWO wie Paperless E.3) **oder** Blob-Provider `aws-s3` auf einen eigenen Hetzner-Bucket (dann gehört `config.json` in ein SOPS-Secret statt in eine ConfigMap).
-2. ~~**SMTP / Mailer.**~~ → **Teil G (1.5)**: Versand über IONOS als `noreply@rm-it.org` (ADR 5). Erledigt, sobald Definition of Done Punkt 15 grün ist. *Bis dahin:* Passwort-Reset nur über den Admin-Link (Stolperstein 10).
+2. ~~**SMTP / Mailer.**~~ ✅ **Erledigt 13.11.2026** mit **Teil G (1.5)**: Versand über IONOS als `noreply@rm-it.org` (ADR 5), Definition of Done Punkt 15 grün. Der Admin-Link (Stolperstein 10) bleibt Ausweichweg.
 3. ~~**Native Apps (iPad, macOS-Desktop) über Access.**~~ ✅ **Erledigt 04.11.2026** durch die Bypass-Policy `affine-bypass` (ADR 4, Nachtrag; verworfene Alternativen dort). *Betriebshinweis:* Server 0.27 akzeptiert Apps ab 0.26. Laufen die Apps aus dem App Store einer neuen Serverversion voraus, kann die Synchronisation stoppen — dann den nächsten AFFiNE-Pull-Request von Renovate zügig mergen.
 4. **Serverseitige Volltextsuche** (Indexer mit Manticore). Ohne: Suche läuft clientseitig, bei vielen Workspaces langsamer.
 5. **Freeform-Bestand.** Freeform hat kein offenes Exportformat; bestehende Boards nur als PDF/Bild exportieren und als Anhang/Bild in AFFiNE ablegen.
@@ -1497,11 +1505,17 @@ Jeder Punkt mit dem Risiko, das bis zur Umsetzung besteht. Reihenfolge = empfohl
 10. **Einladungssperre für neue Konten wieder aktivieren, sobald mehr als zwei Personen AFFiNE nutzen.** *Risiko:* Mit `auth.newAccountShareActionDelay: 0` (B.3, Stolperstein 9) kann jedes Konto ab der ersten Minute Einladungs- und Share-Links erzeugen. Bei geschlossener Registrierung und zwei bekannten Personen vertretbar. Hinter Access gelockert (seit 04.11.2026) weiterhin vertretbar, weil neue Konten nur der Admin anlegt. *Auslöser:* mehr als zwei Personen oder Registrierung geöffnet → Eintrag entfernen (Default `86400` s) oder passenden Wert setzen.
 11. **Blob-PVC gegen Löschen absichern (gemeinsam mit Paperless).** *Risiko:* Das PV von `affine-storage` hat `reclaimPolicy: Delete` (StorageClass `qnap-iscsi`), `apps-affine` läuft mit `prune: true`. Fliegt `pvc.yaml` aus der `kustomization.yaml` oder wird `apps-affine` bzw. der Namespace entfernt, löscht Flux die PVC — Bilder und Anhänge wären weg (Whiteboards, Konten und Workspaces liegen in der DB und sind gesichert). Paperless hat dieselbe Lage. *Bewertung:* Die Flux-Annotation `kustomize.toolkit.fluxcd.io/prune: disabled` an der PVC schützt nur vor dem ersten Fall, nicht vor dem Löschen des Namespace; `Retain` ginge nur per direktem Patch am PV oder über eine eigene StorageClass (Shared-Infrastruktur). *Umsetzung später:* als eigenes Vorhaben für beide Apps, zusammen mit Punkt 1. Entscheidung Rico 01.11.2026.
 12. **Mail-Domain zu Proton (Abstimmung mit `claude/rezept-proton-pantheon.md`).** *Risiko:* Zieht `rm-it.org` später zu Proton um, müssen SPF, DKIM und MX in einem Zug umgestellt werden; wird nur der MX geändert, landen Antworten an `noreply@` nicht mehr in der IONOS-Weiterleitung, wird nur SPF ersetzt, scheitert der AFFiNE-Versand über IONOS. *Umsetzung später:* im Proton-Rezept Block D für AFFiNE entweder auf Proton-SMTP umstellen (dann `MAILER_HOST` und Secret tauschen, IONOS-Einträge entfernen) oder IONOS als Versandweg behalten (dann bleibt `include:_spf-eu.ionos.com` im SPF und die IONOS-DKIM-Einträge bleiben stehen).
-13. **DKIM-Signatur durch IONOS nachprüfen.** *Risiko:* Am 13.11.2026 kamen die Testmails ohne `DKIM-Signature` an (`dkim=none`, G.3); der kontospezifische Selektor `s42582890` löst bei IONOS noch nicht auf (G.2). Zustellung läuft über SPF und `dmarc=pass`, aber ohne DKIM steigt das Spam-Risiko bei strengen Empfängern, und `p=quarantine` (Proton-Vorhaben) wäre bei weitergeleiteten Mails riskant. *Vorgehen:* G.3 nach 24 h wiederholen. Bleibt es bei `dkim=none`, im IONOS-Konto bzw. beim IONOS-Support die DKIM-Aktivierung für Domains mit externen Nameservern (Cloudflare) klären.
+13. ~~**DKIM-Signatur durch IONOS nachprüfen.**~~ ✅ **Erledigt 13.11.2026:** IONOS signiert seit 13.11.2026 mit `s1-ionos` (`dkim=pass` in G.6); `s42582890` ungenutzt, der CNAME bleibt stehen. *Ursprünglich:* *Risiko:* Am 13.11.2026 kamen die Testmails ohne `DKIM-Signature` an (`dkim=none`, G.3); der kontospezifische Selektor `s42582890` löst bei IONOS noch nicht auf (G.2). Zustellung läuft über SPF und `dmarc=pass`, aber ohne DKIM steigt das Spam-Risiko bei strengen Empfängern, und `p=quarantine` (Proton-Vorhaben) wäre bei weitergeleiteten Mails riskant. *Vorgehen:* G.3 nach 24 h wiederholen. Bleibt es bei `dkim=none`, im IONOS-Konto bzw. beim IONOS-Support die DKIM-Aktivierung für Domains mit externen Nameservern (Cloudflare) klären.
 
 ---
 
 ## Rezept-Changelog
+
+**1.5.2 (13.11.2026)** — Teil G abgeschlossen.
+- **G.5:** Ergebnis eingetragen (Mailer im Pod aktiv, Rollout ohne Neustart). **Korrektur:** Prüfung `MAILER_PASSWORD` → `affine-smtp` von `grep -A3` auf `grep -A4`, weil `kubectl kustomize` die Schlüssel alphabetisch sortiert (`key` vor `name`).
+- **G.6:** Ergebnis eingetragen. Verifikationsmail angekommen, `spf`/`dkim`/`dmarc=pass`; `email_verified` für Rico in der Datenbank gesetzt.
+- **DKIM erledigt:** IONOS signiert seit 13.11.2026 mit `s1-ionos`; `s42582890` ungenutzt, CNAME bleibt stehen. G.3-Ergebnis und „Bewusst zurückgestellt" Punkt 13 als erledigt markiert.
+- **Definition of Done Punkt 15 ✅**, „Bewusst zurückgestellt" Punkt 2 (SMTP) erledigt. Abend 9 in der Abendtabelle auf ✅, Status im Kopf nachgezogen.
 
 **1.5.1 (13.11.2026)** — Teil G, Abend 9: G.1–G.4 durchlaufen.
 - **G.1, G.2, G.3, G.4:** Ergebnisse eingetragen (7 DNS-Einträge angelegt, SMTP-Test erfolgreich, Secret bereit).
