@@ -13,7 +13,7 @@ CHART_VERSION="3.14.0"
 # renovate: datasource=docker depName=registry.k8s.io/metrics-server/metrics-server
 IMAGE_TAG="v0.9.1"
 # renovate: datasource=github-releases depName=helm/helm
-HELM_VERSION="v4.3.1"
+HELM_VERSION="v4.3.2"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="${REPO_ROOT}/infrastructure/controllers/metrics-server/metrics-server.yaml"
