@@ -82,6 +82,26 @@ spec:
             # Container -> aus. Suche im Client funktioniert weiterhin.
             - name: AFFINE_INDEXER_ENABLED
               value: "false"
+            # Systemmails über IONOS (ADR 5, Teil G). MAILER_* hat Vorrang vor
+            # mailer.SMTP in config.json -> Zugangsdaten bleiben im Secret.
+            - name: MAILER_HOST
+              value: smtp.ionos.de
+            # 587 = STARTTLS. Für 465 (implizites TLS) ist ungeprüft, ob AFFiNE
+            # die TLS-Variante selbst wählt -> bewusst 587.
+            - name: MAILER_PORT
+              value: "587"
+            - name: MAILER_IGNORE_TLS
+              value: "false"
+            - name: MAILER_USER
+              value: noreply@rm-it.org
+            - name: MAILER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: affine-smtp
+                  key: mailer-password
+            # IONOS akzeptiert als Absender nur die Postfach-Adresse selbst.
+            - name: MAILER_SENDER
+              value: "Pantheon Whiteboard <noreply@rm-it.org>"
           securityContext:
             allowPrivilegeEscalation: false
           volumeMounts:

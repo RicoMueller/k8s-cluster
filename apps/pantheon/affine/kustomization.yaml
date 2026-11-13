@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - affine-secret.yaml
+  - affine-smtp-secret.yaml
   - configmap.yaml
   - pvc.yaml
   - redis.yaml
