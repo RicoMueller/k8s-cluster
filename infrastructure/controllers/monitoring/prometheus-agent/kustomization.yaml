@@ -5,6 +5,9 @@ resources:
   - serviceaccount.yaml
   - clusterrole.yaml
   - clusterrolebinding.yaml
-  - configmap.yaml
   - remote-write-secret.yaml
   - deployment.yaml
+configMapGenerator:
+  - name: prometheus-agent-config
+    files:
+      - prometheus.yml

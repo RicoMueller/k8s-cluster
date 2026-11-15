@@ -1,0 +1,46 @@
+# Prometheus-Agent (Pantheon) — wird per configMapGenerator zur ConfigMap prometheus-agent-config.
+# Name mit Hash: jede Änderung startet den Agent-Pod neu (Prometheus lädt Konfiguration nicht selbst nach).
+global:
+  scrape_interval: 60s
+  external_labels:
+    cluster: pantheon
+
+remote_write:
+  - url: http://192.168.178.124:9090/api/v1/write   # CT 110, FRITZ!Box-Reservierung (Stolperstein G)
+    basic_auth:
+      username: pantheon-agent
+      password_file: /etc/prometheus/secrets/password
+    queue_config:
+      max_shards: 2
+      batch_send_deadline: 30s
+
+scrape_configs:
+  # Sensor: Kubernetes-Objektzustand (CronJobs, Jobs, Pods, Nodes)
+  - job_name: kube-state-metrics
+    static_configs:
+      - targets: ["kube-state-metrics.monitoring.svc.cluster.local:8080"]
+
+  # Sensor: CNPG-Instanzen (Backup-Zeitstempel, WAL-Archiver, up) — Port 9187 "metrics"
+  - job_name: cnpg
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: [databases]
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_cnpg_io_podRole]
+        regex: instance
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        regex: metrics
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_label_cnpg_io_cluster]
+        target_label: cnpg_cluster
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+    metric_relabel_configs:
+      # cnpg_collector_up bringt cluster="<CNPG-Cluster>" mit und verdrängt damit das
+      # external_label cluster=pantheon. Der CNPG-Name steht bereits in cnpg_cluster.
+      - action: labeldrop
+        regex: cluster
