@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-agent
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus-agent
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prometheus-agent
+    spec:
+      serviceAccountName: prometheus-agent
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: prometheus-agent
+          image: quay.io/prometheus/prometheus:v3.16.0  # renovate: datasource=docker depName=quay.io/prometheus/prometheus
+          imagePullPolicy: IfNotPresent
+          args:
+            - --agent
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.agent.path=/prometheus
+            - --web.listen-address=:9090
+          ports:
+            - name: http
+              containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            initialDelaySeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 384Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+              readOnly: true
+            - name: secrets
+              mountPath: /etc/prometheus/secrets
+              readOnly: true
+            - name: data
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-agent-config
+        - name: secrets
+          secret:
+            secretName: prometheus-remote-write
+            defaultMode: 0440
+        - name: data
+          emptyDir:
+            sizeLimit: 512Mi
