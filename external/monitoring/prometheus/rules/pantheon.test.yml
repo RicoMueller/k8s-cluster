@@ -1,0 +1,173 @@
+rule_files:
+  - pantheon.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # Fall 1: Export erfolgreich zum Zeitpunkt 0 — nach 10 h kein Alarm, nach 37 h Alarm.
+  - interval: 1m
+    input_series:
+      - series: 'kube_cronjob_status_last_successful_time{cluster="pantheon",namespace="paperless",cronjob="paperless-backup"}'
+        values: '0x2300'
+    alert_rule_test:
+      - eval_time: 10h
+        alertname: PaperlessBackupStale
+        exp_alerts: []
+      - eval_time: 37h
+        alertname: PaperlessBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              cluster: pantheon
+              namespace: paperless
+              cronjob: paperless-backup
+            exp_annotations:
+              summary: "Paperless-Export seit über 36 h nicht erfolgreich"
+              description: "CronJob paperless-backup (02:30) hat zwei Nächte in Folge keinen Erfolg gemeldet. Prüfen: kubectl get jobs -n paperless --sort-by=.status.startTime | tail -5"
+
+  # Fall 2: Metrikzufluss reißt ab — nach 20 min ohne up-Serie feuert PantheonNoMetrics.
+  - interval: 1m
+    input_series:
+      - series: 'up{cluster="pantheon",job="kube-state-metrics"}'
+        values: '1x60 _x60'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: PantheonNoMetrics
+        exp_alerts: []
+      - eval_time: 85m
+        alertname: PantheonNoMetrics
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              cluster: pantheon
+              job: kube-state-metrics
+            exp_annotations:
+              summary: "Pantheon liefert seit 15 Minuten keine Metriken"
+              description: "Kein remote_write vom prometheus-agent. Ursache: Cluster, Agent-Pod, Netz zwischen Cluster und CT 110 oder Basic-Auth. Alle anderen Pantheon-Alarme werden unterdrückt, bis dieser gelöst ist."
+
+  # Fall 3: WAL-Archiv scheitert — failed_time überholt archived_time, 30 min später critical.
+  - interval: 1m
+    input_series:
+      - series: 'cnpg_pg_stat_archiver_last_archived_time{cluster="pantheon",cnpg_cluster="pantheon-pg",pod="pantheon-pg-1"}'
+        values: '1000x120'
+      - series: 'cnpg_pg_stat_archiver_last_failed_time{cluster="pantheon",cnpg_cluster="pantheon-pg",pod="pantheon-pg-1"}'
+        values: '0x60 2000x60'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: PantheonPgWalArchiveFailing
+        exp_alerts: []
+      - eval_time: 100m
+        alertname: PantheonPgWalArchiveFailing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              cluster: pantheon
+              cnpg_cluster: pantheon-pg
+              pod: pantheon-pg-1
+            exp_annotations:
+              summary: "pantheon-pg (pantheon-pg-1): WAL-Archivierung schlägt fehl"
+              description: "Seit 30 Minuten scheitern WAL-Uploads zum ObjectStore — der PITR-Stand veraltet. Prüfen: kubectl cnpg status pantheon-pg -n databases (Continuous Backup status), S3-Credentials, Hetzner-Endpoint."
+
+  # Fall 4: Omni-Zustellung. Bis 120 min stimmen Git und Cluster überein (v1.20.1, Cluster mit Digest);
+  # dann springt Git auf v1.21.0, der Cluster bleibt — 8 h später critical. Prüft nebenbei, dass der
+  # Digest aus image_spec korrekt abgestreift wird (sonst würde schon der Fall "gleich" feuern).
+  - interval: 1m
+    input_series:
+      - series: 'pantheon_git_image_info{file="omni/manifests/cilium.yaml",image="quay.io/cilium/cilium",tag="v1.20.1"}'
+        values: '1x120 _x600'
+      - series: 'pantheon_git_image_info{file="omni/manifests/cilium.yaml",image="quay.io/cilium/cilium",tag="v1.21.0"}'
+        values: '_x120 1x600'
+      - series: 'kube_pod_container_info{cluster="pantheon",namespace="kube-system",pod="cilium-abc",container="cilium-agent",image_spec="quay.io/cilium/cilium:v1.20.1@sha256:ae9e"}'
+        values: '1x720'
+      - series: 'kube_pod_container_info{cluster="pantheon",namespace="kube-system",pod="cilium-def",container="cilium-agent",image_spec="quay.io/cilium/cilium:v1.20.1@sha256:ae9e"}'
+        values: '1x720'
+    alert_rule_test:
+      - eval_time: 100m
+        alertname: PantheonOmniManifestDrift
+        exp_alerts: []
+      - eval_time: 9h
+        alertname: PantheonOmniManifestDrift
+        exp_alerts: []
+      - eval_time: 10h30m
+        alertname: PantheonOmniManifestDrift
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              file: omni/manifests/cilium.yaml
+              image: quay.io/cilium/cilium
+              tag: v1.21.0
+            exp_annotations:
+              summary: "Omni-Manifest nicht zugestellt: quay.io/cilium/cilium ist in Git v1.21.0, im Cluster nicht"
+              description: "Seit 8 h weicht omni/manifests/cilium.yaml (main) vom laufenden Cluster ab. Entweder ist die Zustellung blockiert (omnictl get ckms pantheon -o yaml | grep lasterror; Runner omni-lan Idle?) oder ein Renovate-Bump wartet auf den Neu-Render (rezept-cilium-upgrade-pantheon.md). Dieser Zustand löst sich nie von selbst."
+
+  # Fall 5: Backup-Strom. Job endet bei 3634 s (34 s Laufzeit) → 30 min lang Bestätigung, danach still weg.
+  # Base-Backup-Zeitstempel springt bei 90 min → 30 min lang Bestätigung.
+  - interval: 1m
+    input_series:
+      - series: 'kube_job_status_start_time{cluster="pantheon",namespace="paperless",job_name="paperless-backup-29300000"}'
+        values: '3600x200'
+      - series: 'kube_job_status_completion_time{cluster="pantheon",namespace="paperless",job_name="paperless-backup-29300000"}'
+        values: '3634x200'
+      - series: 'kube_job_status_succeeded{cluster="pantheon",namespace="paperless",job_name="paperless-backup-29300000"}'
+        values: '1x200'
+      - series: 'kube_job_owner{cluster="pantheon",namespace="paperless",job_name="paperless-backup-29300000",owner_kind="CronJob",owner_name="paperless-backup"}'
+        values: '1x200'
+      - series: 'barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{cluster="pantheon",cnpg_cluster="pantheon-pg",pod="pantheon-pg-1"}'
+        values: '1000x90 2000x110'
+    alert_rule_test:
+      - eval_time: 55m
+        alertname: BackupJobSucceeded
+        exp_alerts: []
+      - eval_time: 70m
+        alertname: BackupJobSucceeded
+        exp_alerts:
+          - exp_labels:
+              severity: info
+              cluster: pantheon
+              namespace: paperless
+              job_name: paperless-backup-29300000
+              owner_name: paperless-backup
+            exp_annotations:
+              summary: "✅ paperless-backup erfolgreich"
+              description: "Job paperless-backup-29300000 in paperless abgeschlossen, Laufzeit 34s."
+      - eval_time: 95m
+        alertname: BackupJobSucceeded
+        exp_alerts: []
+      - eval_time: 80m
+        alertname: CnpgBackupSucceeded
+        exp_alerts: []
+      - eval_time: 100m
+        alertname: CnpgBackupSucceeded
+        exp_alerts:
+          - exp_labels:
+              severity: info
+              cluster: pantheon
+              cnpg_cluster: pantheon-pg
+            exp_annotations:
+              summary: "✅ pantheon-pg Base-Backup abgeschlossen"
+              description: "Neues Base-Backup im ObjectStore pantheon-pg-store (Hetzner) verfügbar."
+      - eval_time: 130m
+        alertname: CnpgBackupSucceeded
+        exp_alerts: []
+
+  # Fall 6: Datenbank weg — beide Instanzen melden ab 30 min up=0. Nach 10 min critical,
+  # und zwar MIT cluster-Label (absent() über einen Vergleich übernimmt keine Labels).
+  - interval: 1m
+    input_series:
+      - series: 'cnpg_collector_up{cluster="pantheon",cnpg_cluster="pantheon-pg",pod="pantheon-pg-1"}'
+        values: '1x30 0x60'
+      - series: 'cnpg_collector_up{cluster="pantheon",cnpg_cluster="pantheon-pg",pod="pantheon-pg-2"}'
+        values: '1x30 0x60'
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: PantheonPgUnavailable
+        exp_alerts: []
+      - eval_time: 50m
+        alertname: PantheonPgUnavailable
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              cluster: pantheon
+            exp_annotations:
+              summary: "pantheon-pg: keine Instanz meldet up=1"
+              description: "Paperless und alle weiteren DB-Nutzer sind betroffen. Prüfen: kubectl get cluster -n databases; kubectl get pods -n databases"

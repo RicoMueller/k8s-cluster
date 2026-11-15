@@ -1,0 +1,214 @@
+# Pantheon — Regeln für Vorgänge. Grundsatz: critical = E-Mail, warning = nur sichtbar.
+# Jede critical-Regel überspannt mindestens einen vollständigen Retry-Zyklus des Vorgangs.
+groups:
+
+  - name: pantheon.liveness
+    rules:
+      - alert: PantheonNoMetrics
+        expr: absent(up{cluster="pantheon", job="kube-state-metrics"})
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pantheon liefert seit 15 Minuten keine Metriken"
+          description: "Kein remote_write vom prometheus-agent. Ursache: Cluster, Agent-Pod, Netz zwischen Cluster und CT 110 oder Basic-Auth. Alle anderen Pantheon-Alarme werden unterdrückt, bis dieser gelöst ist."
+
+      - alert: PantheonKubeStateMetricsDown
+        expr: up{cluster="pantheon", job="kube-state-metrics"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "kube-state-metrics antwortet nicht (Agent läuft)"
+
+      - alert: PantheonMonitoringWatchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: "Dauerfeuer-Alarm: beweist, dass Regelauswertung und Alertmanager-Pfad funktionieren (stumm geroutet)"
+
+  - name: pantheon.backups
+    rules:
+      - alert: PaperlessBackupStale
+        expr: time() - kube_cronjob_status_last_successful_time{cluster="pantheon", namespace="paperless", cronjob="paperless-backup"} > 36 * 3600
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Paperless-Export seit über 36 h nicht erfolgreich"
+          description: "CronJob paperless-backup (02:30) hat zwei Nächte in Folge keinen Erfolg gemeldet. Prüfen: kubectl get jobs -n paperless --sort-by=.status.startTime | tail -5"
+
+      - alert: PaperlessOffsiteSyncStale
+        expr: time() - kube_cronjob_status_last_successful_time{cluster="pantheon", namespace="paperless", cronjob="paperless-offsite-sync"} > 36 * 3600
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Paperless Off-site-Sync (Storage Box) seit über 36 h nicht erfolgreich"
+          description: "Dokumente liegen derzeit nur auf der QNAP — das Szenario aus rezept-paperless E.7. Prüfen: kubectl logs -n paperless job/<letzter paperless-offsite-sync-Job>"
+
+      - alert: PaperlessJobFailed
+        expr: kube_job_status_failed{cluster="pantheon", namespace="paperless"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job {{ $labels.job_name }} in paperless fehlgeschlagen"
+          description: "Einzelner Fehlschlag — Retries laufen noch. Wird critical, sobald der Vorgang 36 h ohne Erfolg bleibt."
+
+      - alert: PantheonPgBackupStale
+        expr: time() - max by (cluster, cnpg_cluster) (barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{cluster="pantheon"}) > 26 * 3600
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.cnpg_cluster }}: kein erfolgreiches Base-Backup seit über 26 h"
+          description: "ScheduledBackup (method: plugin) liefert nicht mehr. Prüfen: kubectl get backup -n databases --sort-by=.metadata.creationTimestamp | tail -3; kubectl cnpg status pantheon-pg -n databases"
+
+      - alert: PantheonPgBackupFailed
+        expr: |
+          max by (cluster, cnpg_cluster) (barman_cloud_cloudnative_pg_io_last_failed_backup_timestamp{cluster="pantheon"})
+            > max by (cluster, cnpg_cluster) (barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{cluster="pantheon"})
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.cnpg_cluster }}: letzter Backup-Versuch gescheitert (ein älteres Backup existiert)"
+
+      - alert: PantheonPgWalArchiveFailing
+        expr: |
+          cnpg_pg_stat_archiver_last_failed_time{cluster="pantheon"}
+            > cnpg_pg_stat_archiver_last_archived_time{cluster="pantheon"}
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.cnpg_cluster }} ({{ $labels.pod }}): WAL-Archivierung schlägt fehl"
+          description: "Seit 30 Minuten scheitern WAL-Uploads zum ObjectStore — der PITR-Stand veraltet. Prüfen: kubectl cnpg status pantheon-pg -n databases (Continuous Backup status), S3-Credentials, Hetzner-Endpoint."
+
+  - name: pantheon.database
+    rules:
+      - alert: PantheonPgUnavailable
+        expr: absent(cnpg_collector_up{cluster="pantheon", cnpg_cluster="pantheon-pg"} == 1)
+        for: 10m
+        labels:
+          severity: critical
+          # absent() über einen Vergleich übernimmt keine Labels — cluster fest setzen,
+          # sonst greifen Inhibition (PantheonNoMetrics) und Wartungsfenster-Silences nicht.
+          cluster: pantheon
+        annotations:
+          summary: "pantheon-pg: keine Instanz meldet up=1"
+          description: "Paperless und alle weiteren DB-Nutzer sind betroffen. Prüfen: kubectl get cluster -n databases; kubectl get pods -n databases"
+
+      - alert: PantheonPgReplicaDegraded
+        expr: count(cnpg_collector_up{cluster="pantheon", cnpg_cluster="pantheon-pg"} == 1) < 2
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "pantheon-pg läuft seit 1 h mit weniger als 2 Instanzen"
+
+  - name: pantheon.info
+    rules:
+      # S15 — Bestätigung pro erfolgreichem CronJob-Lauf. Wert = Laufzeit in Sekunden (für humanizeDuration).
+      # Feuert ab Abschluss für 30 min und löst sich dann still auf (Alertmanager: send_resolved false).
+      # Neue Läufe haben neue job_name-Labels → jeder Lauf ist eine eigene Bestätigung.
+      - alert: BackupJobSucceeded
+        expr: |
+          (
+            (kube_job_status_completion_time{cluster="pantheon", namespace="paperless"}
+              - kube_job_status_start_time{cluster="pantheon", namespace="paperless"})
+            * on (namespace, job_name) group_left (owner_name)
+              kube_job_owner{cluster="pantheon", namespace="paperless", owner_kind="CronJob"}
+          )
+          and on (namespace, job_name) (kube_job_status_succeeded{cluster="pantheon"} == 1)
+          and on (namespace, job_name) ((time() - kube_job_status_completion_time{cluster="pantheon"}) >= 0)
+          and on (namespace, job_name) ((time() - kube_job_status_completion_time{cluster="pantheon"}) < 1800)
+        labels:
+          severity: info
+        annotations:
+          summary: "✅ {{ $labels.owner_name }} erfolgreich"
+          description: "Job {{ $labels.job_name }} in {{ $labels.namespace }} abgeschlossen, Laufzeit {{ $value | humanizeDuration }}."
+
+      # S16 — Bestätigung pro neuem Base-Backup (Zeitstempel im ObjectStore hat sich geändert).
+      - alert: CnpgBackupSucceeded
+        expr: |
+          max by (cluster, cnpg_cluster) (
+            changes(barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{cluster="pantheon"}[30m])
+          ) > 0
+        labels:
+          severity: info
+        annotations:
+          summary: "✅ {{ $labels.cnpg_cluster }} Base-Backup abgeschlossen"
+          description: "Neues Base-Backup im ObjectStore pantheon-pg-store (Hetzner) verfügbar."
+
+  - name: pantheon.omni
+    rules:
+      # S12 — "Rendering erfolgreich": Sollzustand (Git, B.2.7) unless Istzustand (Cluster).
+      # Die rechte Seite zerlegt image_spec ("repo:tag@sha256:…") in image und tag; ein Digest im
+      # Manifest ist damit unschädlich. Während eines Rollouts existieren alt und neu nebeneinander —
+      # sobald ein Pod den Git-Tag trägt, matcht die Regel und schweigt (Rollout-Hänger → S13).
+      - alert: PantheonOmniManifestDrift
+        expr: |
+          pantheon_git_image_info
+            unless on (image, tag)
+          label_replace(
+            label_replace(
+              count by (image_spec) (kube_pod_container_info{cluster="pantheon", namespace="kube-system", container=~"cilium-agent|cilium-operator|cilium-envoy"}),
+              "image", "$1", "image_spec", "^([^:@]+):.*"),
+            "tag", "$1", "image_spec", "^[^:@]+:([^@]+).*")
+        for: 8h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Omni-Manifest nicht zugestellt: {{ $labels.image }} ist in Git {{ $labels.tag }}, im Cluster nicht"
+          description: "Seit 8 h weicht omni/manifests/cilium.yaml (main) vom laufenden Cluster ab. Entweder ist die Zustellung blockiert (omnictl get ckms pantheon -o yaml | grep lasterror; Runner omni-lan Idle?) oder ein Renovate-Bump wartet auf den Neu-Render (rezept-cilium-upgrade-pantheon.md). Dieser Zustand löst sich nie von selbst."
+
+      - alert: PantheonCiliumRolloutStuck
+        expr: |
+          kube_daemonset_status_number_ready{cluster="pantheon", namespace="kube-system", daemonset="cilium"}
+            < kube_daemonset_status_desired_number_scheduled{cluster="pantheon", namespace="kube-system", daemonset="cilium"}
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cilium-DaemonSet seit 1 h nicht vollständig ready ({{ $value }} ready)"
+
+      - alert: PantheonGitStateStale
+        expr: |
+          pantheon_git_state_fetch_success == 0
+            or (time() - pantheon_git_state_last_fetch_timestamp > 2 * 3600)
+            or absent(pantheon_git_image_info)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Git-Seite des Omni-Sensors liefert nicht (CT 110: pantheon-git-state.timer / GitHub erreichbar?)"
+
+  - name: pantheon.cluster
+    rules:
+      - alert: PantheonNodeNotReady
+        expr: kube_node_status_condition{cluster="pantheon", condition="Ready", status="true"} == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node {{ $labels.node }} seit 30 min NotReady"
+
+      - alert: PantheonMultipleNodesNotReady
+        expr: count(kube_node_status_condition{cluster="pantheon", condition="Ready", status="true"} == 0) >= 2
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $value }} Nodes gleichzeitig NotReady"
+          description: "Mehr als ein Node weg — Switch-Reboot (erwartet im Wartungsfenster, dann Silence setzen) oder echter Ausfall."
+
+      - alert: PantheonPodRestartLoop
+        expr: increase(kube_pod_container_status_restarts_total{cluster="pantheon", namespace=~"paperless|databases|flux-system|kube-system"}[1h]) > 5
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}): > 5 Restarts in 1 h"

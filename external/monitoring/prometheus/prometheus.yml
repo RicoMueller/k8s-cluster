@@ -1,0 +1,27 @@
+# Pantheon-Monitoring — externer Prometheus (CT 110).
+# Cluster-Metriken kommen per remote_write vom prometheus-agent (external_label cluster="pantheon");
+# einziger lokaler Scrape-Job ist die Git-Seite des Zustellungs-Sensors (localhost:9100).
+global:
+  scrape_interval: 60s
+  evaluation_interval: 60s
+  external_labels:
+    monitor: pantheon-mon
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["192.168.178.97:9093"]
+
+rule_files:
+  - /etc/prometheus/rules/*.rules.yml   # NICHT *.yml — sonst wird die Unit-Test-Datei als Regeldatei geladen (Stolperstein I)
+
+scrape_configs:
+  # Git-Seite des Sensors S12 (B.2.7): node_exporter-Textfile auf diesem Container.
+  # Nur die pantheon_git_*-Serien behalten — die Node-Telemetrie des LXC ist nicht Ziel dieses Stacks.
+  - job_name: git-state
+    static_configs:
+      - targets: ["localhost:9100"]
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "pantheon_git_.*"
+        action: keep

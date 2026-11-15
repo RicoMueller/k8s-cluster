@@ -1,0 +1,16 @@
+apiVersion: 1
+datasources:
+  - name: Pantheon-Prometheus
+    uid: pantheon-prom
+    type: prometheus
+    access: proxy
+    url: http://192.168.178.124:9090
+    isDefault: true
+    basicAuth: true
+    basicAuthUser: grafana
+    secureJsonData:
+      # Passwort B liegt nur auf CT 112 (0640 root:grafana), nicht in dieser Datei
+      basicAuthPassword: $__file{/etc/grafana/prometheus-grafana.password}
+    jsonData:
+      timeInterval: 60s
+      httpMethod: POST

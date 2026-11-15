@@ -1,0 +1,88 @@
+# Pantheon-Monitoring — Alertmanager (CT 111).
+# Kanäle (ADR-003/ADR-009):
+#   critical              → Push (Prio 1, Ton) + E-Mail
+#   info (Backup-Strom)   → Push (Prio -1, leise), kein Resolved
+#   Backup-Fehlschläge    → Push (Prio 0)
+#   alles andere          → stumm (nur UI/Dashboard)
+global:
+  smtp_smarthost: "smtp.ionos.de:587"
+  smtp_from: "Pantheon Alerts <noreply@rm-it.org>"   # IONOS: Absender nur die Postfach-Adresse
+  smtp_auth_username: "noreply@rm-it.org"
+  smtp_auth_password_file: /etc/alertmanager/smtp.password
+  smtp_require_tls: true
+  resolve_timeout: 5m
+
+route:
+  receiver: silent                    # Default: stumm
+  group_by: ["alertname", "cluster"]
+  group_wait: 10m                     # Sammelfenster vor der ersten Benachrichtigung
+  group_interval: 6h                  # neue Alarme derselben Gruppe: frühestens nach 6 h
+  repeat_interval: 24h                # anhaltender Zustand: max. 1 Benachrichtigung/Tag
+  routes:
+    - matchers: ['alertname="PantheonMonitoringWatchdog"']
+      receiver: silent
+
+    # Backup-Strom: jeder erfolgreiche Lauf = eine leise Push-Bestätigung (S15/S16)
+    - matchers: ['severity="info"']
+      receiver: push-backup-info
+      group_by: ["alertname", "namespace", "job_name", "cnpg_cluster"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+
+    # Fehlschlag eines Backup-Vorgangs (S4/S6): Push normal, keine Mail
+    - matchers: ['alertname=~"PaperlessJobFailed|PantheonPgBackupFailed"']
+      receiver: push-backup-warn
+      group_by: ["alertname", "namespace", "job_name", "cnpg_cluster"]
+      group_wait: 2m
+      group_interval: 1h
+      repeat_interval: 24h
+
+    - matchers: ['severity="critical"']
+      receiver: notfall
+
+receivers:
+  - name: silent                      # bewusst ohne Integration
+
+  - name: push-backup-info
+    pushover_configs:
+      - user_key_file: /etc/alertmanager/pushover.user
+        token_file: /etc/alertmanager/pushover.token
+        send_resolved: false          # Bestätigung endet still
+        priority: "-1"                # leise: kein Ton, keine Vibration
+        title: "{{ .CommonAnnotations.summary }}"
+        message: "{{ .CommonAnnotations.description }}"
+
+  - name: push-backup-warn
+    pushover_configs:
+      - user_key_file: /etc/alertmanager/pushover.user
+        token_file: /etc/alertmanager/pushover.token
+        send_resolved: true
+        priority: "0"
+        title: "⚠️ {{ .CommonAnnotations.summary }}"
+        message: "{{ .CommonAnnotations.description }}"
+
+  - name: notfall
+    email_configs:
+      - to: "noreply@rm-it.org"            # IONOS leitet an Ricos private Adresse weiter
+        send_resolved: true
+        headers:
+          Subject: "[Pantheon NOTFALL] {{ .CommonLabels.alertname }} — {{ .Status | toUpper }}"
+    pushover_configs:
+      - user_key_file: /etc/alertmanager/pushover.user
+        token_file: /etc/alertmanager/pushover.token
+        send_resolved: true
+        priority: "1"                 # hoch: Ton, umgeht Ruhezeiten der App
+        sound: "siren"
+        title: "🚨 Pantheon: {{ .CommonLabels.alertname }} ({{ .Status | toUpper }})"
+        message: "{{ .CommonAnnotations.summary }}\n{{ .CommonAnnotations.description }}"
+
+inhibit_rules:
+  # Liefert der Cluster nichts, sind alle abgeleiteten Alarme Folgeerscheinungen.
+  - source_matchers: ['alertname="PantheonNoMetrics"']
+    target_matchers: ['alertname!="PantheonNoMetrics"']
+    equal: ["cluster"]
+  # Fällt die DB komplett, ist ein fehlendes Replica kein eigener Alarm.
+  - source_matchers: ['alertname="PantheonPgUnavailable"']
+    target_matchers: ['alertname="PantheonPgReplicaDegraded"']
+    equal: ["cluster"]
