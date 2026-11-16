@@ -106,8 +106,8 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 | Block | Inhalt | Rico aktiv | Claude Code | HALTs | Wirkung im Cluster |
 |---|---|---|---|---|---|
 | 0 ✅ 16.11.2026 (0.6 offen) | Rezept ins Repo, Vorab-Checks, Upstream-Abgleich, Versionen; **0.6 Speicher freiräumen** | 5 Min (Eingaben) + 0.6: ~1 h aktiv, spätestens vor Block F | ~25 Min | 0 | keine (0.6: nur QNAP) |
-| A | Cloudflare-Token, alle Grund-Secrets inkl. SMTP | ~15 Min | Prüfung `ENC[` | — | keine |
-| B | Wildcard-Zertifikat, HTTPS-Listener am Gateway | — | ~30 Min | 0 | HTTPS im LAN für `*.rm-it.org` |
+| A ✅ 16.11.2026 | Cloudflare-Token, alle Grund-Secrets inkl. SMTP | ~15 Min | Prüfung `ENC[` | — | keine |
+| B ✅ 16.11.2026 | Wildcard-Zertifikat, HTTPS-Listener am Gateway | — | ~30 Min | 0 | HTTPS im LAN für `*.rm-it.org` |
 | C | Keycloak-DB, Keycloak mit SMTP, Routen | ~15 Min | ~40 Min | 1 | Identität läuft (LAN), Keycloak sendet Mails |
 | D | OpenCloud mit Mail-Benachrichtigungen, WOPI, Collabora, Routen, Renovate | ~10 Min | ~40 Min | 1 | OpenCloud im LAN nutzbar |
 | E | Sicherheits-Gate, DNS-Routen, externe Prüfungen, Geräte | ~20 Min | ~20 Min | 2 | von außen + Apps |
@@ -655,25 +655,38 @@ Claude Code trägt die Werte ins Ergebnisprotokoll 0.6 ein, setzt im Blockplan �
 
 > Der Token darf nur DNS der einen Zone ändern — cert-manager legt damit kurzlebige `_acme-challenge`-TXT-Einträge an.
 
-## A.2 — Secrets erzeugen und verschlüsseln *(eigenes Terminal)*
+## A.2 — Secrets erzeugen und verschlüsseln *(eigenes Terminal, vier Schritte)*
 
-Muster wie AFFiNE G.4: Subshell in runden Klammern (Variablen bleiben nicht in der Shell zurück, `umask 077`), `kubectl create secret … --dry-run=client` maskiert Sonderzeichen (wichtig für das IONOS-Passwort) und spricht nicht mit dem Cluster. Bricht `sops` ab, wird die Klartextdatei gelöscht.
+Muster wie AFFiNE G.4: `umask 077`, `kubectl create secret … --dry-run=client` maskiert Sonderzeichen (wichtig für das IONOS-Passwort) und spricht nicht mit dem Cluster. Bricht `sops` ab, wird die Klartextdatei gelöscht. **Eingaben stehen in eigenen Schritten** — nie zusammen mit anderen Zeilen einfügen. Ein **neues Terminal-Fenster** nur für diesen Abschnitt öffnen (⌘N).
+
+**Schritt 1 — vorbereiten** *(ohne Eingabe, im Ganzen einfügen)*:
+
+```bash
+cd ~/k8s-cluster && umask 077 && mkdir -p apps/pantheon/opencloud infrastructure/controllers/networking/certificates && for f in infrastructure/controllers/databases/pantheon-pg/keycloak-db-role-secret.yaml apps/pantheon/opencloud/opencloud-secret.yaml apps/pantheon/opencloud/opencloud-smtp-secret.yaml infrastructure/controllers/networking/certificates/cloudflare-api-token-secret.yaml; do test -e "$f" && echo "ABBRUCH: $f existiert schon"; done; echo VORBEREITET
+# Erwartung: nur VORBEREITET
+```
+
+**Schritt 2 — Cloudflare-Token** *(einzeln einfügen, dann Token einfügen + Enter)*:
+
+```bash
+printf 'Cloudflare-API-Token (cert-manager, DNS-01 rm-it.org): '; read -rs CF_TOKEN; echo; echo "Länge: ${#CF_TOKEN}"
+```
+
+**Schritt 3 — Postfachpasswort** *(einzeln einfügen, dann Passwort einfügen + Enter)*:
+
+```bash
+printf 'Postfachpasswort noreply@rm-it.org (IONOS, wie affine-smtp): '; read -rs SMTP_PW; echo; echo "Länge: ${#SMTP_PW}"
+```
+
+**Schritt 4 — erzeugen und verschlüsseln** *(ohne Eingabe, im Ganzen einfügen; Subshell übernimmt beide Variablen)*:
 
 ```bash
 (
 cd ~/k8s-cluster || exit 1
-umask 077
 D=infrastructure/controllers/databases/pantheon-pg
 O=apps/pantheon/opencloud
 C=infrastructure/controllers/networking/certificates
-mkdir -p "$O" "$C"
-for f in "$D/keycloak-db-role-secret.yaml" "$O/opencloud-secret.yaml" \
-         "$O/opencloud-smtp-secret.yaml" "$C/cloudflare-api-token-secret.yaml"; do
-  test -e "$f" && { echo "ABBRUCH: $f existiert schon"; exit 1; }
-done
-
-printf "Cloudflare-API-Token: ";         read -rs CF_TOKEN; echo
-printf "Passwort noreply@rm-it.org: ";   read -rs SMTP_PW;  echo
+test -n "$CF_TOKEN" && test -n "$SMTP_PW" || { echo "ABBRUCH: Token oder Postfachpasswort leer"; exit 1; }
 KC_DBPW=$(openssl rand -hex 24)
 KC_ADMINPW=$(openssl rand -hex 16)
 
@@ -697,15 +710,15 @@ for f in "$D/keycloak-db-role-secret.yaml" "$O/opencloud-secret.yaml" \
 done
 
 echo
-echo "Keycloak-Bootstrap-Admin:  kcadmin  /  $KC_ADMINPW"
-echo "-> jetzt sicher ablegen (gebraucht in C.5, danach nur noch für einen Neuaufbau)."
-unset CF_TOKEN SMTP_PW KC_DBPW KC_ADMINPW
-
+echo "Keycloak-Bootstrap-Admin (Realm master, temporär) – Benutzer: kcadmin  Passwort: $KC_ADMINPW"
+echo
 grep -c 'ENC\[' "$D/keycloak-db-role-secret.yaml" "$O/opencloud-secret.yaml" \
   "$O/opencloud-smtp-secret.yaml" "$C/cloudflare-api-token-secret.yaml"
 )
 # Erwartung: je Datei eine Zahl >= 2
 ```
+
+Passwort im Passwortmanager ablegen als **„Keycloak-Bootstrap-Admin kcadmin (Realm master, temporär)"** (gebraucht in C.5, danach nur noch für einen Neuaufbau). Dann **einzeln** `unset CF_TOKEN SMTP_PW; clear; exit` und das Fenster schließen.
 
 > **⚠️ Stolperstein 20 — `.sops.yaml` verschlüsselt nur `data`/`stringData`.** `kubectl create … -o yaml` schreibt die Werte unter `data` (Base64) — die Regel greift. Ein `grep -c 'ENC\['` von `0` heißt: Datei ist Klartext — nicht committen.
 
@@ -878,10 +891,10 @@ echo | openssl s_client -connect 192.168.178.224:443 -servername "$HOST" 2>/dev/
 
 | Prüfpunkt | Erwartung | Ist |
 |---|---|---|
-| ClusterIssuer Ready | True | |
-| Certificate Ready, Ablaufdatum | True, +90 Tage | |
-| Listener `https` Programmed | True | |
-| `curl --resolve` auf bestehende Route | 200/302, LE-Zertifikat | |
+| ClusterIssuer Ready | True | True (condition met) |
+| Certificate Ready, Ablaufdatum | True, +90 Tage | True; 16.11.2026 → 14.02.2027, Erneuerung ab 15.01.2027 |
+| Listener `https` Programmed | True | True, ResolvedRefs True, attachedRoutes 3 (affine, homepage, paperless); `http` unverändert (4, True) |
+| `curl --resolve` auf bestehende Route | 200/302, LE-Zertifikat | `affine.rm-it.org`: 200; issuer Let's Encrypt YR1, CN=*.rm-it.org; HTTP-Listener weiter 200 |
 
 ---
 
@@ -2886,6 +2899,7 @@ Reihenfolge = empfohlene Priorität, jeweils mit dem Risiko bis dahin.
 - **WOPI (Architekturentscheidung 5):** `collaboration` als Dienst im OpenCloud-Prozess unter `https://cloud.rm-it.org/wopi` (wie Upstream). Hostname `wopi.rm-it.org`, WOPI-Container, Service und Route entfallen; Collabora `aliasgroup1` auf `cloud.rm-it.org`.
 - **Neu 0.6 (Rico):** Speicher im QNAP-Pool freiräumen (Transfer löschen, Abyss Of Hel und TimeMachine verkleinern, UrdaSot verschlüsselt auf die Storage Box archivieren und löschen). Teil 0 hatte 2,5 TB frei gegen 3,6 TB Bedarf gemessen. Block F prüft das als Eingang; das Archiv belegt voraussichtlich den Storage-Box-Sub-Account `u620152-sub2`, Block H nutzt deshalb `u620152-sub3`; Block J deaktiviert den HBS-3-Spiegel PrivateCloud und entfernt das Volume mit dem Konto-Löschen.
 - **Korrekturen:** OpenCloud-Tag 7.2.3 → 7.2.5; Laufzeitformel in 0.5 mit × 8000 statt × 8 (GB → Mbit).
+- **A.2 in vier Schritte geteilt** (Eingaben einzeln, wie am 16.11.2026 ausgeführt): eine Passwortabfrage im selben Einfügeblock wie weitere Zeilen frisst sonst die Folgezeilen als Eingabe. Bootstrap-Admin-Passwort mit sprechendem Namen.
 
 **1.1 (16.11.2026)** — Abgleich mit dem Cluster, Systemmails über IONOS, Fokus Dropbox-Ablösung.
 - **Repo-Stand eingearbeitet** (Commit `1a72f8c`): Ablage unter `docs/rezepte/`, `CLAUDE.md` „Laufendes Vorhaben" wird in Teil 0.1 auf OpenCloud umgestellt; Regeln aus `CLAUDE.md` und `.claude/settings.json` übernommen (kein `sops`, kein `cloudflared` für Claude Code, Push nach Freigabe mit `git show --stat`, nur Dateien des Schritts stagen). Feste Werte statt Platzhalter: Listener `http`, Namespace `cert-manager`, Flux `infrastructure-networking`/`infrastructure-cert-manager`, Gateway-Manifest-Pfad, Tunnel-Catch-all.
