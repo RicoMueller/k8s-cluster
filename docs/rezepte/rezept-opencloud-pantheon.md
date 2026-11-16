@@ -4,9 +4,9 @@
 >
 > Das Rezept ist in **Blöcke** geschnitten, die Claude Code jeweils in einem Stück abarbeitet. Unterbrechungen gibt es nur an den markierten **⏸ HALT**-Punkten — dort, wo Rico eingreifen muss (Secrets, Weboberflächen, `cloudflared`, Geräte, unumkehrbare Entscheidungen). Ablageort im Repo: `docs/rezepte/rezept-opencloud-pantheon.md`.
 
-*Rezeptversion: 1.1 — November 2026 · Cluster: Pantheon · Zielversion: OpenCloud 7.2.x (Production-Linie)*
+*Rezeptversion: 1.2 — November 2026 · Cluster: Pantheon · Zielversion: OpenCloud 7.2.x (Production-Linie)*
 
-> **Status:** Nicht live verifiziert. Version 1.1 ist gegen den Repository-Stand vom 16.11.2026 abgeglichen (Commit `1a72f8c`): Gateway nur mit HTTP-Listener `http`, cert-manager über `infrastructure-cert-manager`, Tunnel `pantheon-apps` mit Catch-all auf `cilium-gateway-pantheon-gateway:80`, `.sops.yaml` verschlüsselt `data`/`stringData` in jeder `*.yaml`, IONOS-SMTP für AFFiNE live seit 13.11.2026 (SPF, DKIM `s1-ionos`, DMARC `p=none`). Faktenbasis OpenCloud: Dokumentation 7.2 (Keycloak-, External-IdP-, PosixFS-, Notifications-, App-Token-, Link-Passwort-Seiten), README von `opencloud-eu/opencloud-compose`, Releases `opencloud-eu/opencloud` (7.2.3 vom 06.08.2026), rclone-WebDAV-Doku. Was sich nur aus den Compose-Dateien selbst ergibt (Images, Realm-Datei, LDAP-Seed, CSP), gleicht Claude Code in **Teil 0** gegen das Upstream-Repo ab und trägt es ein. Nach jedem Block die Erwartungswerte mit den echten Ausgaben abgleichen (Ergebnisprotokoll am Blockende).
+> **Status:** Nicht live verifiziert. Version 1.2 enthält die Ergebnisse und Entscheidungen aus Teil 0 (16.11.2026, Details in `apps/pantheon/opencloud/UPSTREAM.md`). Version 1.1 ist gegen den Repository-Stand vom 16.11.2026 abgeglichen (Commit `1a72f8c`): Gateway nur mit HTTP-Listener `http`, cert-manager über `infrastructure-cert-manager`, Tunnel `pantheon-apps` mit Catch-all auf `cilium-gateway-pantheon-gateway:80`, `.sops.yaml` verschlüsselt `data`/`stringData` in jeder `*.yaml`, IONOS-SMTP für AFFiNE live seit 13.11.2026 (SPF, DKIM `s1-ionos`, DMARC `p=none`). Faktenbasis OpenCloud: Dokumentation 7.2 (Keycloak-, External-IdP-, PosixFS-, Notifications-, App-Token-, Link-Passwort-Seiten), README von `opencloud-eu/opencloud-compose`, Releases `opencloud-eu/opencloud` (7.2.3 vom 06.08.2026), rclone-WebDAV-Doku. Was sich nur aus den Compose-Dateien selbst ergibt (Images, Realm-Datei, LDAP-Seed, CSP), gleicht Claude Code in **Teil 0** gegen das Upstream-Repo ab und trägt es ein. Nach jedem Block die Erwartungswerte mit den echten Ausgaben abgleichen (Ergebnisprotokoll am Blockende).
 
 > **Vorgeschichte.** Im Juni 2026 war OpenCloud als „Raw Manifests, decomposedS3 auf MinIO-on-QNAP" geplant und an zwei Voraussetzungen gebunden (Homepage Block B, MinIO). Dieses Rezept ersetzt die Architekturnotiz: MinIO ist als Community-Edition inzwischen archiviert, OpenCloud speichert seit 2.0 standardmäßig per PosixFS — die MinIO-Voraussetzung entfällt (Architekturentscheidung 1).
 
@@ -20,7 +20,7 @@
 - **Teil 0** — Vorab-Checks und Upstream-Abgleich *(Claude Code)*
 - **Block A** — Secrets *(Rico)*
 - **Block B** — HTTPS am Gateway, LAN-Direktweg *(Claude Code, ohne HALT)*
-- **Block C** — Identität: Keycloak-Datenbank, OpenLDAP, Keycloak *(1 HALT)*
+- **Block C** — Identität: Keycloak-Datenbank, Keycloak *(1 HALT)*
 - **Block D** — OpenCloud-Kern und Web-Office *(1 HALT)*
 - **Block E** — Öffentlicher Zugang und Apps *(1 HALT)*
 - **Block F** — Migration I: Vorbereitung und Kopie *(1 HALT)*
@@ -39,7 +39,7 @@
 1. OpenCloud läuft unter `https://cloud.rm-it.org`. Browser, OpenCloud-Desktop (macOS) und die Apps für iOS/Android melden sich über Keycloak an — mit Zwei-Faktor (TOTP), weil der Login der Apps im System-Browser stattfindet.
 2. Im Heimnetz gehen alle Clients **direkt** auf das `pantheon-gateway` (gültiges Let's-Encrypt-Zertifikat), unterwegs über den Cloudflare-Tunnel. Gleiche URL überall.
 3. Der Dropbox-Bestand liegt vollständig im persönlichen Space von Rico, geprüft per Dropbox-Inhalts-Hash gegen den Dateibaum auf dem Server.
-4. Teilen mit Bandkollegen: öffentliche Links (Passwort per Default Pflicht) oder Gastkonten ohne eigenen Speicher. Gäste bekommen eine Einladungsmail von `noreply@rm-it.org`, setzen ihr Passwort selbst und können es selbst zurücksetzen.
+4. Teilen mit Bandkollegen: öffentliche Links (Passwort per Default Pflicht) oder Gastkonten ohne eigenen Speicher. Gäste bekommen eine Einladungsmail von `noreply@rm-it.org`, setzen ihr Passwort selbst, melden sich einmal an (danach sind sie im Teilen-Dialog auffindbar) und können ihr Passwort selbst zurücksetzen.
 5. Office-Dokumente im Browser (Collabora), Volltextsuche in Dokumenten (Tika, nach der Migration).
 6. Backup: QNAP-Snapshots (vollständig, inkl. Metadaten) + nächtliche, verschlüsselte Off-site-Kopie auf die Storage Box; Keycloak-Datenbank im bestehenden Barman-Backup.
 7. Updates ausschließlich über Renovate-Pull-Requests und Flux.
@@ -105,10 +105,10 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 
 | Block | Inhalt | Rico aktiv | Claude Code | HALTs | Wirkung im Cluster |
 |---|---|---|---|---|---|
-| 0 | Rezept ins Repo, Vorab-Checks, Upstream-Abgleich, Versionen | 5 Min (Eingaben im Startprompt) | ~25 Min | 0 | keine |
+| 0 ✅ 16.11.2026 (0.6 offen) | Rezept ins Repo, Vorab-Checks, Upstream-Abgleich, Versionen; **0.6 Speicher freiräumen** | 5 Min (Eingaben) + 0.6: ~1 h aktiv, spätestens vor Block F | ~25 Min | 0 | keine (0.6: nur QNAP) |
 | A | Cloudflare-Token, alle Grund-Secrets inkl. SMTP | ~15 Min | Prüfung `ENC[` | — | keine |
 | B | Wildcard-Zertifikat, HTTPS-Listener am Gateway | — | ~30 Min | 0 | HTTPS im LAN für `*.rm-it.org` |
-| C | Keycloak-DB, OpenLDAP, Keycloak mit SMTP, Routen | ~15 Min | ~40 Min | 1 | Identität läuft (LAN), Keycloak sendet Mails |
+| C | Keycloak-DB, Keycloak mit SMTP, Routen | ~15 Min | ~40 Min | 1 | Identität läuft (LAN), Keycloak sendet Mails |
 | D | OpenCloud mit Mail-Benachrichtigungen, WOPI, Collabora, Routen, Renovate | ~10 Min | ~40 Min | 1 | OpenCloud im LAN nutzbar |
 | E | Sicherheits-Gate, DNS-Routen, externe Prüfungen, Geräte | ~20 Min | ~20 Min | 2 | von außen + Apps |
 | F | Dropbox-Zugang, Testkopie, Vollkopie starten | ~20 Min | ~30 Min + Laufzeit (Tage) | 1 | Kopie läuft im Hintergrund |
@@ -161,10 +161,10 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 | Komponente | Rolle | In Pantheon |
 |---|---|---|
 | `opencloudeu/opencloud` | Server, Web-Client, WebDAV, Graph-API, TUS-Uploads — Port 9200. Läuft als UID 1000. | Deployment `opencloud`, eine Replica |
-| `opencloud collaboration server` | WOPI-Server zwischen OpenCloud und Collabora — Port 9300 | **zweiter Container im selben Pod** (Architekturentscheidung 5) |
+| `opencloud collaboration` | WOPI-Server zwischen OpenCloud und Collabora | **Dienst im OpenCloud-Prozess** (`OC_ADD_RUN_SERVICES`), erreichbar unter `https://cloud.rm-it.org/wopi` (Architekturentscheidung 5) |
 | Collabora Online (CODE) | Office im Browser — Port 9980 | Deployment `collabora`, zustandslos |
 | Keycloak | OIDC-Provider, Zwei-Faktor, Brute-Force-Schutz | Deployment `keycloak`, DB `keycloak` in `pantheon-pg` |
-| OpenLDAP | Gemeinsames Benutzerverzeichnis für Keycloak und OpenCloud | Deployment `ldap-server`, 1-Gi-PVC |
+| Eingebautes Verzeichnis `idm` | OpenCloud-Konten und -Gruppen; Konten entstehen bei der ersten Anmeldung aus Keycloak (Autoprovisioning) | Dienst im OpenCloud-Prozess, Datei `idm/idm.boltdb` auf PVC `opencloud-data` (Architekturentscheidung 3) |
 | Apache Tika | Textextraktion für die Volltextsuche — Port 9998 | Deployment `tika`, zustandslos, erst Block K (nach der Migration) |
 | SMTP (extern) | Systemmails von Keycloak und OpenCloud | IONOS `smtp.ionos.de:587`, Postfach `noreply@rm-it.org` (Architekturentscheidung 8) |
 
@@ -174,7 +174,7 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 | `/etc/opencloud/csp.yaml` u. a. | Angepasste Konfigurationsdateien aus Upstream | ConfigMap (Git) |
 | `/var/lib/opencloud/storage/users/…` | **Die Dateien selbst**, als lesbarer Ordnerbaum (PosixFS), Metadaten in Extended Attributes | PVC `opencloud-data` (`__DATA_SIZE__`) |
 | `/var/lib/opencloud/…` (übrige) | NATS-KV (ID-Cache), Suchindex, Thumbnails | PVC `opencloud-data` |
-| — | Konten, Gruppen | OpenLDAP-PVC; Keycloak-Sessions/Clients in DB `keycloak` |
+| `/var/lib/opencloud/idm/idm.boltdb` | OpenCloud-Konten und -Gruppen (eingebautes Verzeichnis) | PVC `opencloud-data`; Keycloak-Konten, Passwörter, OTP, Clients, Sessions in DB `keycloak` |
 
 > **Merksatz:** Es gibt keine Datenbank, die einen Index über die Dateien führt — der Dateibaum *ist* die Wahrheit. Darum: niemals am laufenden OpenCloud vorbei im Dateibaum schreiben (lesen ist erlaubt).
 
@@ -203,7 +203,7 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 >
 > **Entscheidung: Kein Access für die OpenCloud-Hostnamen. Die Sicherheit liegt im Identity Provider und in der Route.**
 > 1. **Keycloak** als einziger Login-Weg: Registrierung aus, Brute-Force-Erkennung an, **TOTP** für Rico (funktioniert mit den Apps, weil deren Login im System-Browser läuft).
-> 2. **Demo-Konten aus dem Upstream-LDAP-Seed entfernt**, bevor irgendetwas öffentlich wird (Stolperstein 1).
+> 2. **Demo-Konten und Demo-Gruppen aus der Upstream-Realm-Datei entfernt**, bevor irgendetwas öffentlich wird; OpenCloud legt kein eigenes Admin-Konto an (Stolperstein 1).
 > 3. **Admin-Konsole von Keycloak nicht öffentlich:** Die öffentliche Route lässt nur `/realms/openCloud` und `/resources` durch — der `master`-Realm (Admin-Login) ist von außen nicht erreichbar. Administration läuft über `keycloak-admin.rm-it.org`, das nur am **HTTPS-Listener** hängt; der Tunnel liefert ausschließlich an den HTTP-Listener.
 > 4. **Öffentliche Links** behalten den OpenCloud-Default: Passwort ist Pflicht.
 > 5. **App-Tokens** (für die rclone-Migration) immer mit Ablaufdatum — sie werden bei einer Sperre in Keycloak **nicht** ungültig (Stolperstein 14).
@@ -214,17 +214,28 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 > - *Nur über Tailscale/VPN:* Bandkollegen und öffentliche Links scheiden aus.
 > - *Access-Service-Token:* Die Apps können keine eigenen Header senden.
 
-## Architekturentscheidung 3: Keycloak + OpenLDAP im „Shared User Directory"-Modus
+## Architekturentscheidung 3: Keycloak mit Autoprovisioning in das eingebaute Verzeichnis (seit 1.2)
 
-> **Problemstellung.** OpenCloud bringt einen eingebauten IdP mit. Keycloak war im Juni bereits als Portfolio-Bestandteil gesetzt; jetzt kommt ein funktionaler Grund hinzu: Ohne Access ist der IdP die einzige Hürde.
+> **Problemstellung.** OpenCloud bringt einen eingebauten IdP mit. Keycloak war im Juni bereits als Portfolio-Bestandteil gesetzt; jetzt kommt ein funktionaler Grund hinzu: Ohne Access ist der IdP die einzige Hürde. Version 1.1 sah Keycloak mit OpenLDAP als gemeinsamem Verzeichnis vor (Upstream `idm/ldap-keycloak.yml`). Teil 0 hat am 16.11.2026 ergeben: Upstream nutzt dafür `bitnamilegacy/openldap:2.6`, seit 19.08.2025 ohne Updates. Ein gepflegter Ersatz fehlt (`osixia/openldap` seit 2021 nur Vorab-Tags, `quay.io/389ds/dirsrv` seit Juni 2025 ohne Push). Auch Upstreams Autoprovisioning-Variante `idm/external-idp.yml` hängt an diesem Image.
 >
-> **Entscheidung: Keycloak mit LDAP-Federation, Upstream-Variante `idm/ldap-keycloak.yml`** (offiziell als Produktions-Setup geführt). LDAP ist die Quelle der Konten; Keycloak authentifiziert dagegen, OpenCloud liest LDAP direkt. Die OIDC-Clients für Web, Desktop, iOS und Android kommen fertig aus der Realm-Datei von Upstream. Keycloak-Datenbank in `pantheon-pg` (Barman-gesichert). Keycloak bleibt **im** Cluster, weil es nur Apps dient und nichts zum Booten oder Reparieren des Clusters braucht.
+> **Entscheidung (Rico, 16.11.2026): Keycloak hält die Konten; OpenCloud legt sie bei der ersten Anmeldung in seinem eingebauten Verzeichnis `idm` an (Autoprovisioning). Kein externes LDAP.**
+> - Keycloak authentifiziert (Passwort, TOTP, Brute-Force-Schutz, Einladung, Passwort vergessen) und liefert `sub`, Name, E-Mail und die Realm-Rollen im Token.
+> - OpenCloud übernimmt Name und E-Mail bei jeder Anmeldung und ordnet die Rolle aus dem Claim `roles` zu: `opencloudAdmin` → admin, `opencloudSpaceAdmin` → spaceadmin, `opencloudUser` → user, `opencloudGuest` → user-light.
+> - Realm-Datei aus Upstream `config/keycloak/opencloud-realm-autoprovisioning.dist.json` (Clients für Web, Desktop, iOS, Android, Rollen, Mapper), bereinigt in C.3.2.
+> - Keycloak-Datenbank in `pantheon-pg` (Barman-gesichert). Keycloak bleibt **im** Cluster, weil es nur Apps dient und nichts zum Booten oder Reparieren des Clusters braucht.
 >
-> **Konsequenz:** OpenCloud ordnet Konten über die LDAP-`entryUUID` zu. Geht das LDAP verloren und werden Konten neu angelegt, entstehen neue UUIDs — die persönlichen Spaces wären verwaist. Das LDAP wird deshalb nächtlich mit Betriebsattributen exportiert (Block H).
+> **Belegt am 7.2.5-Quelltext** (`UPSTREAM.md`): Graph schreibt per Default in `idm` (`ldap://localhost:9236`, Schreiben erlaubt) — Voraussetzung für `PROXY_AUTOPROVISION_ACCOUNTS`; bei leerem `OC_ADMIN_USER_ID` legt `idm` kein Admin-Konto an; der Proxy aktualisiert Anzeigename und E-Mail beim Login. Upstream liefert diese Kombination nicht als fertige Compose-Datei → D.9/D.10 prüfen sie mit `rico` und `testgast` live, **bevor** migriert wird.
+>
+> **Konsequenzen:**
+> - Ein Konto existiert in OpenCloud erst nach der ersten Anmeldung. Mit einer Person teilen geht erst danach (Stolperstein 27).
+> - Entfernen in zwei Schritten: in Keycloak sperren/löschen **und** in OpenCloud löschen (Stolperstein 28).
+> - `idm/idm.boltdb` ordnet Keycloak-`sub` den internen OpenCloud-IDs zu. Ginge sie verloren, entstünden beim nächsten Login neue Konten, die persönlichen Spaces wären verwaist. Sie liegt auf `opencloud-data` und ist von QNAP-Snapshots und Off-site-Kopie erfasst (Block H); Wiederherstellung immer zusammen mit dem Config-PVC.
 >
 > **Verworfene Alternativen:**
-> - *Eingebauter IdP:* weniger Komponenten — aber ein späterer Wechsel des IdP ändert die Benutzer-IDs. Diese Entscheidung muss **vor** der Migration von 2 TB fallen, nicht danach.
-> - *Autoprovisioning-Modus:* Keycloak hielte die Konten; die Realm-Konfiguration (Clients, Rollen-Claims, Mapper) müsste aber selbst gebaut werden statt aus der getesteten Upstream-Datei zu kommen.
+> - *Keycloak + OpenLDAP, Shared User Directory (Version 1.1):* einziges Upstream-Image `bitnamilegacy` ohne Updates — widerspricht der Renovate-Strategie (Stolperstein 6).
+> - *Upstream `idm/external-idp.yml` wörtlich:* dasselbe Image.
+> - *OpenLDAP-Image selbst bauen:* eigener Build und eigenes Patchen — kein spekulatives Tooling.
+> - *Eingebauter IdP statt Keycloak:* weniger Komponenten — aber ein späterer Wechsel des IdP ändert die Benutzer-IDs. Diese Entscheidung muss **vor** der Migration von 2 TB fallen, nicht danach.
 
 ## Architekturentscheidung 4: Interne Secrets erzeugt OpenCloud selbst — einmaliges `opencloud init`
 
@@ -234,18 +245,18 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 >
 > **Verworfene Alternative — alle Secrets als SOPS-Env-Variablen** (Muster einiger Community-Charts): Die Liste ist versionsabhängig; ein Upgrade wie 7.0 (neuer Service-Account) bricht still, wenn ein Eintrag fehlt. AFFiNE hatte genau **einen** Schlüssel — dort war Git die bessere Wahl, hier nicht.
 
-## Architekturentscheidung 5: Topologie — WOPI im Pod, HTTPS am Gateway, Server-zu-Server über `hostAliases`
+## Architekturentscheidung 5: Topologie — WOPI im OpenCloud-Prozess, HTTPS am Gateway, Server-zu-Server über `hostAliases`
 
 > **Problemstellung.** (a) Der WOPI-Dienst `collaboration` braucht dieselbe `opencloud.yaml` und den NATS-Registry-Dienst von OpenCloud; das Config-PVC ist RWO. (b) OpenCloud, Collabora und WOPI rufen sich gegenseitig über ihre **öffentlichen** URLs auf (OIDC-Discovery, WOPI-Callbacks). (c) Der Desktop-Client lädt beim ersten Sync den ganzen Bestand — über den Tunnel wären das Tage und ein Konflikt mit den Cloudflare-Nutzungsbedingungen für große Dateien.
 >
 > **Entscheidung:**
-> 1. `collaboration` läuft als **zweiter Container im OpenCloud-Pod** (gleiches Image, gleicher Tag, gemeinsames Config-Volume, NATS über `127.0.0.1`).
+> 1. `collaboration` läuft als **zusätzlicher Dienst im OpenCloud-Prozess** (`OC_ADD_RUN_SERVICES=notifications,collaboration`, wie Upstream `weboffice/collabora.yml` seit 2026). Der WOPI-Endpunkt ist `https://cloud.rm-it.org/wopi` (Proxy-Route in 7.2.5 vorhanden) — kein eigener Hostname, kein zweiter Container, keine eigene NATS-Adresse. *(Seit 1.2, Entscheidung Rico 16.11.2026.)*
 > 2. **Wildcard-Zertifikat `*.rm-it.org`** per cert-manager (DNS-01 über Cloudflare) und ein **HTTPS-Listener** am `pantheon-gateway` (Block B). Im LAN löst AdGuard die OpenCloud-Hostnamen direkt auf die Gateway-IP auf.
 > 3. Pods erreichen die öffentlichen Hostnamen über `hostAliases` → Gateway-IP, also ohne Umweg über das Internet.
 >
 > **Nebeneffekt:** Damit ist auch die seit Juni offene Lücke „Gateway-TLS im LAN" für alle `*.rm-it.org`-Routen geschlossen.
 >
-> **Verworfene Alternativen:** *collaboration als eigenes Deployment* (bräuchte `podAffinity` aufs RWO-Volume und eine eigene NATS-Adresse); *Server-zu-Server über Cloudflare* (Internet-Abhängigkeit für interne Aufrufe); *nur Tunnel* (siehe (c)).
+> **Verworfene Alternativen:** *collaboration als zweiter Container mit eigenem Hostnamen `wopi.rm-it.org`* (Version 1.1: ein Hostname, eine Route, ein Service und eine Startreihenfolge mehr; Upstream ist davon abgerückt); *collaboration als eigenes Deployment* (bräuchte `podAffinity` aufs RWO-Volume und eine eigene NATS-Adresse); *Server-zu-Server über Cloudflare* (Internet-Abhängigkeit für interne Aufrufe); *nur Tunnel* (siehe (c)).
 
 ## Architekturentscheidung 6: Migration im Cluster — rclone von der Dropbox-API direkt in OpenCloud
 
@@ -269,8 +280,8 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 >
 > | Schicht | Was | Wiederherstellung |
 > |---|---|---|
-> | 1. QNAP-Snapshots (täglich, 14 Tage) | LUNs von `opencloud-data`, `opencloud-config`, `ldap-data` | Vollständig inkl. Extended Attributes, Freigaben, Versionen |
-> | 2. Off-site, nächtlich, **rclone crypt** → Storage Box (eigener Sub-Account) | Dateibaum, Config-PVC, LDAP-Export; geänderte/gelöschte Dateien 30 Tage im Archiv (`--backup-dir`) | Dateien vollständig; Freigaben/Versionen gehen verloren (Restore = Assimilation in frische Instanz) |
+> | 1. QNAP-Snapshots (täglich, 14 Tage) | LUNs von `opencloud-data` (inkl. `idm`) und `opencloud-config` | Vollständig inkl. Extended Attributes, Freigaben, Versionen |
+> | 2. Off-site, nächtlich, **rclone crypt** → Storage Box (eigener Sub-Account) | Dateibaum inkl. `idm/idm.boltdb`, Config-PVC; geänderte/gelöschte Dateien 30 Tage im Archiv (`--backup-dir`) | Dateien vollständig; Freigaben/Versionen gehen verloren (Restore = Assimilation in frische Instanz) |
 > | 3. Barman (bestehend) | DB `keycloak` | PITR wie bei AFFiNE |
 >
 > **Bewusst akzeptiert:** Beide Kopien sind *crash-konsistent* (kein Stopp der Instanz) — RPO 24 h. Für eine Ein-Personen-Dateiablage vertretbar; eine nachts geänderte Datei ist im Zweifel in der nächsten Nacht konsistent.
@@ -323,7 +334,6 @@ apps/pantheon/opencloud/
 ├── namespace.yaml
 ├── opencloud-secret.yaml                   ← SOPS, von Rico (Block A)
 ├── opencloud-smtp-secret.yaml              ← SOPS, von Rico (Block A): IONOS-Postfach-Passwort
-├── ldap/            ldap.yaml, seed/*.ldif
 ├── keycloak/        keycloak.yaml, opencloud-realm.json
 ├── opencloud/       pvc.yaml, deployment.yaml, service.yaml, config/*
 ├── collabora.yaml
@@ -375,7 +385,6 @@ HOSTNAMEN=ok             (oder Abweichungen zur Tabelle in 0.0)
 | Keycloak (Login, Konto) | `keycloak.rm-it.org` | LAN + öffentlich, nur `/realms/openCloud`, `/resources` |
 | Keycloak-Administration | `keycloak-admin.rm-it.org` | **nur LAN** (HTTPS-Listener, keine öffentliche DNS) |
 | Collabora | `collabora.rm-it.org` | LAN + öffentlich |
-| WOPI | `wopi.rm-it.org` | LAN + öffentlich |
 
 > **⚠️ Stolperstein 18 — Hostnamen sind endgültig.** OIDC-Issuer, Client-Redirects und alle App-Konten hängen an diesen Namen. Später ändern heißt: Realm anpassen und jedes Gerät neu anmelden.
 
@@ -522,7 +531,7 @@ kubectl run oc-init-help --rm -i --quiet --restart=Never -n default \
 
 Feste Werte aus dem Repo (keine Platzhalter mehr): cert-manager-Namespace `cert-manager`, HTTP-Listener `http`, Gateway-Manifest `infrastructure/controllers/networking/pantheon-gateway.yaml`, Flux `infrastructure-networking` und `infrastructure-cert-manager`. Weicht 0.2 davon ab → STOPP.
 
-**Laufzeiten hochrechnen** (für den Abschlussbericht): Vollkopie ≈ `DROPBOX_GB × 8 / DOWN_MBIT / 3600 × 1,3` Stunden; Off-site-Erstlauf ≈ `DROPBOX_GB × 8 / UP_MBIT / 3600 × 1,3` Stunden (Faktor 1,3 für Protokoll-Overhead und Drosselung). Tagsüber bremst `--bwlimit` den Off-site-Lauf zusätzlich (Block H).
+**Laufzeiten hochrechnen** (für den Abschlussbericht): Vollkopie ≈ `DROPBOX_GB × 8000 / DOWN_MBIT / 3600 × 1,3` Stunden; Off-site-Erstlauf ≈ `DROPBOX_GB × 8000 / UP_MBIT / 3600 × 1,3` Stunden (GB → Mbit: × 8000) (Faktor 1,3 für Protokoll-Overhead und Drosselung). Tagsüber bremst `--bwlimit` den Off-site-Lauf zusätzlich (Block H).
 
 **STOPP-Bedingungen Teil 0:**
 
@@ -530,9 +539,9 @@ Feste Werte aus dem Repo (keine Platzhalter mehr): cert-manager-Namespace `cert-
 |---|---|
 | Gateway hat bereits einen HTTPS-Listener oder der Listener heißt nicht `http` | Block B müsste angepasst werden — Rico entscheidet |
 | Eine Flux-Kustomization liest `networking/certificates` bereits mit | Doppelte Verwaltung in Block B |
-| `QNAP_FREE_TB` < `__DATA_SIZE__` × 1,2 (Snapshot-Reserve) | Daten-PVC und Snapshots würden den Pool füllen |
+| `QNAP_FREE_TB` < `__DATA_SIZE__` × 1,2 (Snapshot-Reserve) | Daten-PVC und Snapshots würden den Pool füllen — *eingetreten 16.11.2026 (2,5 < 3,6), Lösung: 0.6* |
 | Mail-DNS weicht von AFFiNE Teil G ab (MX, SPF, DKIM) | Keycloak/OpenCloud-Mails würden abgewiesen — erst klären |
-| OpenLDAP-Image aus Upstream stammt von `bitnami`/`bitnamilegacy` ohne laufende Updates | widerspricht Renovate-Strategie (Stolperstein 6) — Rico entscheidet über die Alternative |
+| OpenLDAP-Image aus Upstream stammt von `bitnami`/`bitnamilegacy` ohne laufende Updates | widerspricht Renovate-Strategie (Stolperstein 6) — Rico entscheidet über die Alternative — *eingetreten 16.11.2026, Lösung: Architekturentscheidung 3 (1.2)* |
 | Realm `editMode` ist nicht `WRITABLE` | Konten ließen sich nicht in Keycloak anlegen — C.5 müsste auf LDAP-Anlage umgestellt werden |
 | Freie Worker-Kapazität < 5 GiB RAM Requests | OpenCloud + Keycloak + Collabora + Tika passen nicht |
 | `TIMEOUTS_OK` fehlt | Route-Timeouts in D.6 nicht möglich — Rico entscheidet |
@@ -553,19 +562,83 @@ git pull --rebase && git push
 
 | Prüfpunkt | Erwartung | Ist |
 |---|---|---|
-| Gateway-IP / Listener | `192.168.178.224`, nur `http` | |
-| cert-manager-Namespace | `cert-manager` | |
-| Mail-DNS | wie AFFiNE G.2 | |
-| Upstream-Commit `opencloud-compose` | SHA | |
-| OpenCloud-Tag | höchste 7.2.x | |
-| Keycloak / Collabora / Tika / OpenLDAP / rclone | konkrete Tags | |
-| `__ADD_SERVICES_VAR__` | Variablenname | |
-| Realm `editMode` / Default-Rolle | `WRITABLE` / `opencloudGuest` | |
-| Demo-Konten im LDAP-Seed | Liste | |
-| `__DATA_SIZE__` | aus `DROPBOX_GB` | |
-| `allowVolumeExpansion` | `true`/`false` | |
-| Hochrechnung Kopie / Off-site-Erstlauf | Stunden | |
-| Abhängigkeiten der Kündigung (`DROPBOX_APPS`) | Liste | |
+| Gateway-IP / Listener | `192.168.178.224`, nur `http` | `192.168.178.224`, nur `http HTTP 80` ohne hostname ✅ |
+| cert-manager-Namespace | `cert-manager` | `cert-manager`; CRDs da; nur `cnpg-system/selfsigned-issuer`, kein ACME-Issuer; `networking/kustomization.yaml` listet `certificates` nicht ✅ |
+| Mail-DNS | wie AFFiNE G.2 | MX `mx00`/`mx01.ionos.de`, ein SPF `include:_spf-eu.ionos.com ~all`, DMARC `p=none`, DKIM `s1-ionos` → CNAME `s1.dkim.ionos.com`, Schlüssel vorhanden; AFFiNE `smtp.ionos.de`/`587`/`noreply@rm-it.org` ✅ |
+| Upstream-Commit `opencloud-compose` | SHA | `d4695d235639f7b14b63efef12d67cfbaab557a6` (13.11.2026) |
+| OpenCloud-Tag | höchste 7.2.x | `7.2.5` (Manifest 200; 8.x/9.x nur `opencloud-rolling`) |
+| Keycloak / Collabora / Tika / OpenLDAP / rclone | konkrete Tags | `26.8.2` / `26.04.6.1.1` / `4.2.0` / ⛔ `bitnamilegacy/openldap:2.6` (STOPP → entfällt, Architekturentscheidung 3) / `1.76.0` |
+| `__ADD_SERVICES_VAR__` | Variablenname | `OC_ADD_RUN_SERVICES`; `__INIT_FLAGS__` = `--insecure false` |
+| Realm `editMode` / Default-Rolle | `WRITABLE` / `opencloudGuest` | `WRITABLE` / `default-roles-opencloud` ⊃ `opencloudGuest` ✅ |
+| Demo-Konten im LDAP-Seed | Liste | `uid=admin` (fester Hash, Standard-Seed!), `alan`, `lynn`, `mary`, `margaret`, `dennis`; 9 Demo-Gruppen; Realm-Demo-Gruppen (u. a. `unix-lovers`→`opencloudAdmin`) |
+| `__DATA_SIZE__` | aus `DROPBOX_GB` | 1690 GB → `3Ti`; ⛔ QNAP frei 2,5 TB < 3,6 (STOPP → Freiräumen in 0.6) |
+| `allowVolumeExpansion` | `true`/`false` | `true`; Worker ~41 GiB RAM-Requests frei; `TIMEOUTS_OK` ✅ |
+| Hochrechnung Kopie / Off-site-Erstlauf | Stunden | ≈ 20 h / ≈ 122 h (≈ 5 Tage), bei 250/40 Mbit/s |
+| Abhängigkeiten der Kündigung (`DROPBOX_APPS`) | Liste | SafeInCloud (Passwort-Datenbank), Obsidian (Vault) |
+| Entscheidungen Rico (16.11.2026) | — | Identität: Autoprovisioning ins eingebaute `idm`; WOPI über `cloud.rm-it.org/wopi`, kein `wopi.rm-it.org`; Speicher freiräumen (0.6) |
+
+## 0.6 — Speicher im QNAP-Pool freiräumen *(Rico, ~1 h aktiv, spätestens vor Block F)*
+
+**Warum:** Teil 0 hat einen STOPP ergeben: frei sind 2,5 TB, nötig sind `3Ti` × 1,2 ≈ 3,6 TB (Daten-PVC plus Snapshot-Reserve). Die Trident-LUNs sind *Thin* — das PVC belegt nur, was geschrieben wird. Die Reserve muss aber da sein, bevor Block F 1,7 TB kopiert. Blöcke A–E dürfen parallel laufen; **Block F startet erst, wenn das Ergebnisprotokoll 0.6 ≥ 3,6 TB zeigt.**
+
+**Ausgangslage** (QNAP → Speicher & Snapshots → Übersicht, 16.11.2026):
+
+| Volume | Typ | Belegt / Größe | Maßnahme | Gewinn |
+|---|---|---|---|---|
+| Transfer | Thin | 186 GB / 341 GB | löschen | ≈ 0,19 TB |
+| Abyss Of Hel | Thick | 0,86 GB / 1014 GB | auf 100 GB verkleinern | ≈ 0,9 TB |
+| TimeMachine | Thick | 0,94 TB / 2,42 TB | auf 1,5 TB verkleinern (1,5 × 1 TB MacBook) | ≈ 0,9 TB |
+| UrdaSot | Thick | 56 GB / 1014 GB | verschlüsselt auf die Storage Box archivieren, dann löschen | ≈ 1,0 TB |
+| PrivateCloud | Thin | 1,34 TB / 2,93 TB | **bleibt** bis Block J (HBS-3-Spiegel der Dropbox) | später ≈ 1,34 TB |
+
+Erwartet frei danach: **≈ 5,5 TB**. PrivateCloud kann als Thin-Volume bis zur Dropbox-Quote (2000 GB) noch ≈ 0,5 TB wachsen — auch dann bleibt genug.
+
+> PrivateCloud (1,34 TB) ist kleiner als der Dropbox-Bestand (1690 GB) — der HBS-3-Spiegel ist vermutlich unvollständig und **kein** Ersatz für die Migration über die Dropbox-API (Block F) oder deren Hash-Prüfung (Block G).
+
+> **⏸ [Rico] — Reihenfolge einhalten; alles in der QNAP-Oberfläche bzw. im Browser**
+>
+> **1. Transfer prüfen und löschen**
+> 1. File Station → Freigabeordner von *Transfer* öffnen: Liegt dort etwas, das in die Migration oder ins Archiv gehört? Falls ja, vorher nach *Wolfstavar* verschieben.
+> 2. Speicher & Snapshots → Speicher → Speicher/Snapshots → *Transfer* markieren → **Verwalten → Entfernen** → Volume löschen bestätigen.
+>
+> **2. Abyss Of Hel auf 100 GB verkleinern**
+> 1. *Abyss Of Hel* markieren → **Verwalten → Größe ändern** (je nach QTS-Version unter *Aktionen*) → neue Größe **100 GB** → Übernehmen.
+> 2. Lässt QNAP das Verkleinern nicht zu (Option fehlt oder Hinweis auf Snapshots): **nichts löschen**, Meldung an Claude Code notieren.
+>
+> **3. TimeMachine auf 1,5 TB verkleinern**
+> 1. Mac: *Systemeinstellungen → Allgemein → Time Machine → Optionen → Backup-Häufigkeit: Manuell* (keine Sicherung während der Größenänderung).
+> 2. QNAP: *TimeMachine* markieren → **Verwalten → Größe ändern** → **1,5 TB** → Übernehmen; warten, bis der Status wieder *Bereit* ist.
+> 3. Mac: Backup-Häufigkeit zurück auf *Automatisch stündlich*, dann **Backup jetzt erstellen** — muss ohne Fehler durchlaufen.
+> 4. Bietet QNAP das Verkleinern nicht an: **nicht** das Volume löschen. Meldung an Claude Code notieren; Ausweg wäre ein neues Thin-Volume mit 1,5 TB und eine frische Time-Machine-Sicherung (Versionsverlauf geht verloren) — das entscheidet Rico gesondert.
+>
+> **4. UrdaSot verschlüsselt archivieren, prüfen, dann löschen**
+> 1. **Hetzner-Konsole → Storage Box `u620152` → Sub-Accounts → Sub-Account erstellen:** Basisverzeichnis `urdasot-archiv`, **WebDAV-Support an**, externe Erreichbarkeit an, Kommentar „UrdaSot-Archiv". Passwort im Passwortmanager ablegen als **„Hetzner Storage Box – Sub-Account urdasot-archiv"**. Hetzner vergibt die Namen fortlaufend; Paperless hat `u620152-sub1`, dieser wird also voraussichtlich **`u620152-sub2`**. Den tatsächlichen Namen ins Ergebnisprotokoll 0.6 eintragen — Block H rechnet mit `u620152-sub3` für das OpenCloud-Backup.
+> 2. **QNAP → HBS 3 → Sichern → Erstellen → Neuer Sicherungsauftrag:** Quelle = Freigabeordner von *UrdaSot* (alles). Ziel = *Cloud-Speicher → WebDAV*, URL `https://` + Sub-Account-Name + `.your-storagebox.de`, Benutzer = Sub-Account-Name, Passwort aus Schritt 1, Zielordner `urdasot`. Auftragsname `UrdaSot-Archiv`.
+> 3. In den **Richtlinien** des Auftrags: **Clientseitige Verschlüsselung an**. Passwort im Passwortmanager ablegen als **„HBS 3 – Verschlüsselung UrdaSot-Archiv"** — ohne dieses Passwort ist das Archiv wertlos. Zeitplan: *Keiner* (einmaliger Lauf). Versionsverwaltung: Standard lassen.
+> 4. Auftrag **jetzt sichern** → warten bis *Abgeschlossen* (56 GB bei 40 Mbit/s Upload ≈ 3–4 h).
+> 5. **Wiederherstellung prüfen:** HBS 3 → *Wiederherstellen* → Auftrag aus dem Ziel `UrdaSot-Archiv` → 3–5 Dateien unterschiedlichen Typs (eine große, ein Dokument, ein Unterordner) in einen neuen Ordner `_restore-test` auf *Wolfstavar* zurückholen → öffnen, Inhalt prüfen → `_restore-test` löschen.
+> 6. Optional, für eine zweite Kopie: denselben Auftrag zusätzlich auf eine externe USB-Platte.
+> 7. Erst jetzt: *UrdaSot* markieren → **Verwalten → Entfernen**. Die 5 Snapshots des Volumes verschwinden dabei mit.
+>
+> **Hinweis zur Langlebigkeit:** Das Archiv liegt im HBS-3-Format (QuDedup). Ohne QNAP lässt es sich mit dem *QuDedup Extract Tool* (macOS/Windows, von qnap.com) und dem Verschlüsselungspasswort entpacken.
+>
+> **5. Ergebnis ablesen:** Speicher & Snapshots → Übersicht → Speicherpool 1 → **Freier Speicher**.
+>
+> **Fortsetzungssatz an Claude Code:** „Speicher freigeräumt, frei: … TB" (Zahl eintragen) — oder die Meldung aus Schritt 2, 3 oder 4.
+
+Claude Code trägt die Werte ins Ergebnisprotokoll 0.6 ein, setzt im Blockplan „0.6 offen" auf ✅ mit Datum und committet (`docs(opencloud): record storage cleanup on qnap`). Bei < 3,6 TB: STOPP, Rico entscheidet (z. B. `__DATA_SIZE__ = 2Ti` mit späterer Erweiterung, `allowVolumeExpansion: true`).
+
+### Ergebnisprotokoll 0.6
+
+| Prüfpunkt | Erwartung | Ist |
+|---|---|---|
+| Transfer gelöscht | ja | |
+| Abyss Of Hel | 100 GB | |
+| TimeMachine | 1,5 TB, Time-Machine-Sicherung danach ok | |
+| UrdaSot-Archiv auf der Storage Box | Sub-Account `u620152-sub2`, Auftrag abgeschlossen | |
+| Wiederherstellungsprobe UrdaSot | Dateien öffnen sich | |
+| UrdaSot gelöscht | ja | |
+| Freier Speicher nach 0.6 | ≥ 3,6 TB (erwartet ≈ 5,5 TB) | |
 
 ---
 
@@ -603,7 +676,6 @@ printf "Cloudflare-API-Token: ";         read -rs CF_TOKEN; echo
 printf "Passwort noreply@rm-it.org: ";   read -rs SMTP_PW;  echo
 KC_DBPW=$(openssl rand -hex 24)
 KC_ADMINPW=$(openssl rand -hex 16)
-LDAP_PW=$(openssl rand -hex 24)
 
 kubectl create secret generic keycloak-db-role -n databases --type=kubernetes.io/basic-auth \
   --from-literal=username=keycloak --from-literal=password="$KC_DBPW" \
@@ -611,7 +683,6 @@ kubectl create secret generic keycloak-db-role -n databases --type=kubernetes.io
 kubectl create secret generic opencloud-secret -n opencloud \
   --from-literal=keycloak-db-password="$KC_DBPW" \
   --from-literal=keycloak-admin-password="$KC_ADMINPW" \
-  --from-literal=ldap-admin-password="$LDAP_PW" \
   --dry-run=client -o yaml > "$O/opencloud-secret.yaml"
 kubectl create secret generic opencloud-smtp -n opencloud \
   --from-literal=smtp-password="$SMTP_PW" \
@@ -628,7 +699,7 @@ done
 echo
 echo "Keycloak-Bootstrap-Admin:  kcadmin  /  $KC_ADMINPW"
 echo "-> jetzt sicher ablegen (gebraucht in C.5, danach nur noch für einen Neuaufbau)."
-unset CF_TOKEN SMTP_PW KC_DBPW KC_ADMINPW LDAP_PW
+unset CF_TOKEN SMTP_PW KC_DBPW KC_ADMINPW
 
 grep -c 'ENC\[' "$D/keycloak-db-role-secret.yaml" "$O/opencloud-secret.yaml" \
   "$O/opencloud-smtp-secret.yaml" "$C/cloudflare-api-token-secret.yaml"
@@ -814,7 +885,7 @@ echo | openssl s_client -connect 192.168.178.224:443 -servername "$HOST" 2>/dev/
 
 ---
 
-# Block C — Identität: Keycloak-Datenbank, OpenLDAP, Keycloak *(1 HALT)*
+# Block C — Identität: Keycloak-Datenbank, Keycloak *(1 HALT)*
 
 ## C.1 — Eingangsprüfung
 
@@ -883,7 +954,7 @@ kubectl get database keycloak -n databases -o jsonpath='{.status.applied}{"\n"}'
 # Erwartung: true
 ```
 
-## C.3 — Namespace, OpenLDAP, Keycloak, Routen
+## C.3 — Namespace, Keycloak, Routen
 
 `apps/pantheon/opencloud/namespace.yaml`:
 
@@ -899,34 +970,22 @@ metadata:
     pod-security.kubernetes.io/warn: baseline
 ```
 
-### C.3.1 — OpenLDAP (`apps/pantheon/opencloud/ldap/`)
+### C.3.1 — entfällt seit 1.2
 
-Claude Code übersetzt den LDAP-Dienst aus `idm/ldap-keycloak.yml` nach Kubernetes. Vorgaben:
+Kein OpenLDAP mehr (Architekturentscheidung 3). Die Nummer bleibt, damit Verweise stabil sind.
 
-| Vorgabe | Umsetzung |
-|---|---|
-| Name | Deployment **und** Service heißen wie der Compose-Dienst (vermutlich `ldap-server`) — Realm-Datei und OpenCloud-Env brauchen dann keine Host-Änderung |
-| Image | Upstream-Image mit konkretem Tag, `imagePullPolicy: IfNotPresent`, `# renovate:`-Marker |
-| Daten | PVC `ldap-data`, `qnap-iscsi`, 1 Gi, Pfad wie im Image vorgesehen; Strategie `Recreate` |
-| Admin-Passwort | aus `opencloud-secret`, Schlüssel `ldap-admin-password`, unter dem Env-Namen des Images |
-| Seed | Schema und LDIFs aus `config/ldap/` als ConfigMap (`configMapGenerator`), **ohne Demo-Konten** |
-| Ports | wie Upstream (vermutlich 1389/1636); Service nur clusterintern |
-| Probes | `tcpSocket` auf den LDAP-Port |
-| Security | `seccompProfile: RuntimeDefault`, `allowPrivilegeEscalation: false`, Nutzer/Gruppe wie Image |
-| Ressourcen | requests 64Mi/25m, limits 256Mi |
+> **⚠️ Stolperstein 1 — Demo-Konten mit bekannten Passwörtern.** Upstreams Realm-Datei für den Autoprovisioning-Modus enthält sechs Konten (`admin`, `alan`, `dennis`, `lynn`, `margaret`, `mary`) und neun Demo-Gruppen, darunter `unix-lovers` mit der Rolle `opencloudAdmin`. Auf einer öffentlich erreichbaren Instanz sind das offene Türen. C.3.2 leert `users` und `groups` vollständig. OpenCloud selbst legt kein Admin-Konto an (`OC_ADMIN_USER_ID=""` in D.4; Gegenprobe D.9). Liste der entfernten Einträge in `UPSTREAM.md`.
 
-> **⚠️ Stolperstein 1 — Demo-Konten mit bekannten Passwörtern.** Der Upstream-Seed enthält Demo-Nutzer und -Gruppen für Tests. Auf einer öffentlich erreichbaren Instanz sind das offene Türen. Claude Code übernimmt nur Basis-DN, die Organisationseinheiten (`ou=users`, `ou=groups`, ggf. `ou=custom,ou=groups`) und technisch nötige Einträge; jeder Personen- oder Demo-Gruppen-Eintrag fliegt raus. Liste der entfernten Einträge in `UPSTREAM.md`.
-
-> **⚠️ Stolperstein 6 — Bitnami-Images.** Bitnami hat seinen Katalog 2025 hinter ein Abonnement verschoben; `bitnamilegacy/*` bekommt keine Updates mehr. Nutzt Upstream ein solches Image, wurde in Teil 0 bereits gestoppt.
+> **⚠️ Stolperstein 6 — Bitnami-Images.** Bitnami hat seinen Katalog 2025 hinter ein Abonnement verschoben; `bitnamilegacy/*` bekommt keine Updates mehr. In 1.1 betraf das OpenLDAP — deshalb seit 1.2 kein LDAP (Architekturentscheidung 3). Taucht ein solches Image später in einer Upstream-Datei auf: nicht übernehmen, STOPP.
 
 ### C.3.2 — Realm-Datei (`apps/pantheon/opencloud/keycloak/opencloud-realm.json`)
 
-Aus der Upstream-Realm-Datei, mit diesen Änderungen (per `jq`, Diff in `UPSTREAM.md`):
+Aus der Upstream-Realm-Datei **`config/keycloak/opencloud-realm-autoprovisioning.dist.json`**, mit diesen Änderungen (per `jq`, Diff in `UPSTREAM.md`):
 
 1. Alle Upstream-Domains (`cloud.opencloud.test`, `keycloak.opencloud.test`, …) → Pantheon-Hostnamen.
 2. `"registrationAllowed": false`, `"bruteForceProtected": true`, `"resetPasswordAllowed": true` (Passwort vergessen per Mail), `"verifyEmail": false`, `"loginWithEmailAllowed": true`, `"actionTokenGeneratedByAdminLifespan": 259200` (Einladungslinks 72 h gültig statt 12 h).
-3. Ein enthaltenes `users`-Array leeren.
-4. LDAP-Bind-Passwort als Platzhalter `${LDAP_ADMIN_PASSWORD}` — Keycloak ersetzt `${…}` beim Import aus Umgebungsvariablen. Keine Klartext-Passwörter in Git.
+3. `users` **und** `groups` leeren (Stolperstein 1).
+4. **Default-Rolle** `default-roles-opencloud` um die Realm-Rolle `opencloudGuest` ergänzen. In der Autoprovisioning-Datei enthält sie keine OpenCloud-Rolle — ein neues Konto hätte sonst keine Rolle. So ist jedes neue Konto zunächst Gast (Stolperstein 2). Keine Klartext-Passwörter in Git; Keycloak ersetzt `${…}` beim Import aus Umgebungsvariablen.
 5. **`smtpServer`** setzen (vorhandenen Upstream-Block ersetzen) — Werte wie AFFiNE Teil G:
    ```json
    "smtpServer": {
@@ -944,12 +1003,14 @@ Aus der Upstream-Realm-Datei, mit diesen Änderungen (per `jq`, Diff in `UPSTREA
    }
    ```
 6. `"internationalizationEnabled": true`, `"supportedLocales": ["de", "en"]`, `"defaultLocale": "de"` — Login-Seite und Mails für Bandkollegen auf Deutsch.
-7. Clients, Rollen, Mapper, LDAP-Federation sonst unverändert.
+7. Clients, Rollen und Mapper sonst unverändert. Keine LDAP-Federation (die Autoprovisioning-Datei enthält keine).
 
 ```bash
 R=apps/pantheon/opencloud/keycloak/opencloud-realm.json
 jq -e '.registrationAllowed == false and .bruteForceProtected == true and .resetPasswordAllowed == true
-       and ((.users // []) | length == 0)
+       and ((.users // []) | length == 0) and ((.groups // []) | length == 0)
+       and ((.components["org.keycloak.storage.UserStorageProvider"] // []) | length == 0)
+       and ([.roles.realm[] | select(.name == "default-roles-opencloud") | .composites.realm[]] | index("opencloudGuest") != null)
        and .smtpServer.host == "smtp.ionos.de" and .smtpServer.from == "noreply@rm-it.org"
        and .smtpServer.password == "${SMTP_PASSWORD}"' "$R" && echo REALM_OK
 grep -c 'opencloud.test' "$R"
@@ -1017,11 +1078,6 @@ spec:
                 secretKeyRef:
                   name: opencloud-secret
                   key: keycloak-admin-password
-            - name: LDAP_ADMIN_PASSWORD        # Platzhalter in der Realm-Datei
-              valueFrom:
-                secretKeyRef:
-                  name: opencloud-secret
-                  key: ldap-admin-password
             - name: SMTP_PASSWORD              # Platzhalter in der Realm-Datei (smtpServer.password)
               valueFrom:
                 secretKeyRef:
@@ -1143,7 +1199,6 @@ resources:
   - namespace.yaml
   - opencloud-secret.yaml
   - opencloud-smtp-secret.yaml
-  - ldap/ldap.yaml
   - keycloak/keycloak.yaml
   - httproutes.yaml
 configMapGenerator:
@@ -1151,9 +1206,6 @@ configMapGenerator:
     namespace: opencloud
     files:
       - keycloak/opencloud-realm.json
-  - name: ldap-seed
-    namespace: opencloud
-    files: []          # Claude Code: Seed-/Schema-Dateien aus ldap/seed/ eintragen
 ```
 
 `clusters/pantheon/apps-opencloud.yaml` (Vorlage `apps-affine.yaml`):
@@ -1185,16 +1237,15 @@ kubectl kustomize apps/pantheon/opencloud/ > /dev/null && echo BUILD_OK
 grep -rn '__[A-Z_]*__' apps/pantheon/opencloud/ || echo NO_PLACEHOLDERS
 O=apps/pantheon/opencloud
 git add "$O/kustomization.yaml" "$O/namespace.yaml" "$O/opencloud-secret.yaml" "$O/opencloud-smtp-secret.yaml" \
-  "$O/ldap" "$O/keycloak" "$O/httproutes.yaml" clusters/pantheon/apps-opencloud.yaml
-git commit -m "feat(opencloud): add identity layer with openldap and keycloak"
+  "$O/keycloak" "$O/httproutes.yaml" clusters/pantheon/apps-opencloud.yaml
+git commit -m "feat(opencloud): add identity layer with keycloak"
 git show --stat HEAD                   # Rico zeigen, Freigabe abwarten
 git pull --rebase && git push
 flux reconcile kustomization flux-system --with-source
 flux get kustomizations apps-opencloud
-kubectl rollout status deploy/ldap-server -n opencloud --timeout=5m
 kubectl rollout status deploy/keycloak -n opencloud --timeout=10m
 kubectl logs -n opencloud deploy/keycloak --since=15m | grep -iE 'import|realm|error' | head -20
-# Erwartung: Realm "openCloud" importiert; keine Fehlerzeilen zu LDAP oder SMTP
+# Erwartung: Realm "openCloud" importiert; keine Fehlerzeilen zu SMTP
 ```
 
 **Prüfungen (alle DNS-unabhängig über `--resolve`):**
@@ -1215,22 +1266,19 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "Host: keycloak-admin.rm-it.org" htt
 curl -s -o /dev/null -w "%{http_code}\n" --resolve keycloak-admin.rm-it.org:443:$GW https://keycloak-admin.rm-it.org/admin/
 # Erwartung: 200 oder 302
 
-# 4. Keine Personen im LDAP (Demo-Konten entfernt). Passwort bleibt im Pod.
-kubectl exec -n opencloud deploy/ldap-server -- sh -c \
-  'ldapsearch -x -H ldap://localhost:<PORT> -D "<ADMIN_DN>" -w "$<PW_VAR>" -b "ou=users,<BASE_DN>" -LLL dn | grep -c "^dn: uid=" || true'
-# Werte <…> aus UPSTREAM.md. Erwartung: 0
+# 4. Keine Konten und Gruppen im importierten Anfangszustand (Demo-Einträge entfernt)
+jq -c '[((.users // []) | length), ((.groups // []) | length)]' apps/pantheon/opencloud/keycloak/opencloud-realm.json
+# Erwartung: [0,0]
 ```
-
-> **Ausnahme von Regel 4:** In Prüfung 4 wird das Passwort nur innerhalb des Pods als Variable verwendet und nie ausgegeben — das ist zulässig. Ausgegeben wird ausschließlich eine Zahl.
 
 ## C.5 — ⏸ HALT: DNS im LAN und Keycloak-Konten *(Rico, ~15 Min)*
 
 > **⏸ HALT [Rico]**
 >
 > **1. AdGuard Home** (`http://192.168.178.53` → Filter → DNS-Umschreibungen) — je ein Eintrag auf `192.168.178.224`:
-> `cloud.rm-it.org`, `keycloak.rm-it.org`, `keycloak-admin.rm-it.org`, `collabora.rm-it.org`, `wopi.rm-it.org`
+> `cloud.rm-it.org`, `keycloak.rm-it.org`, `keycloak-admin.rm-it.org`, `collabora.rm-it.org`
 >
-> **2. FRITZ!Box** (Heimnetz → Netzwerk → Netzwerkeinstellungen → DNS-Rebind-Schutz): dieselben fünf Namen als Ausnahmen eintragen — wie bei den Omni-Hostnamen, jeder Name einzeln.
+> **2. FRITZ!Box** (Heimnetz → Netzwerk → Netzwerkeinstellungen → DNS-Rebind-Schutz): dieselben vier Namen als Ausnahmen eintragen — wie bei den Omni-Hostnamen, jeder Name einzeln.
 >
 > **3. Keycloak-Administration** — `https://keycloak-admin.rm-it.org/admin/` öffnen, mit `kcadmin` und dem Passwort aus Block A anmelden:
 > 1. Realm **master** → Users → **eigenes dauerhaftes Admin-Konto** anlegen, Passwort setzen, Rolle `admin` zuweisen. Abmelden, mit dem neuen Konto anmelden, **`kcadmin` löschen**.
@@ -1248,6 +1296,10 @@ kubectl exec -n opencloud deploy/ldap-server -- sh -c \
 
 > **⚠️ Stolperstein 2 — Default-Rolle `opencloudGuest`.** Im Upstream-Realm bekommt jedes neue Konto per Default die Gast-Rolle — ohne persönlichen Space. Ohne explizite Rolle `opencloudAdmin`/`opencloudUser` sieht man nach dem Login einen leeren OpenCloud ohne „Meine Dateien".
 
+> **⚠️ Stolperstein 27 — Konto erst nach der ersten Anmeldung.** Im Autoprovisioning-Modus legt OpenCloud ein Konto erst an, wenn sich die Person zum ersten Mal anmeldet. Vorher findet der Teilen-Dialog sie nicht. Reihenfolge deshalb immer: in Keycloak anlegen → Einladung → Person meldet sich einmal an → teilen (D.9, I.4).
+
+> **⚠️ Stolperstein 28 — Konten in zwei Systemen.** Sperren oder Löschen in Keycloak verhindert die Anmeldung, das OpenCloud-Konto (mit Freigaben, App-Tokens, ggf. Speicher) bleibt aber bestehen. Endgültig entfernen: Keycloak → Users → Delete **und** OpenCloud → Administration → Benutzer → Löschen. App-Tokens vorher in OpenCloud löschen (Stolperstein 14).
+
 > **⚠️ Stolperstein 17 — temporärer Bootstrap-Admin.** Keycloak 26 kennzeichnet `kcadmin` als temporär und warnt in der Konsole. Das dauerhafte Konto mit eigenem Passwort ist der saubere Zustand; das Passwort aus Block A ist danach nur noch für einen Neuaufbau relevant.
 
 ## C.6 — Gegenprobe *(Claude Code)*
@@ -1256,10 +1308,9 @@ kubectl exec -n opencloud deploy/ldap-server -- sh -c \
 GW=192.168.178.224
 dig +short cloud.rm-it.org @192.168.178.53
 # Erwartung: 192.168.178.224
-kubectl exec -n opencloud deploy/ldap-server -- sh -c \
-  'ldapsearch -x -H ldap://localhost:<PORT> -D "<ADMIN_DN>" -w "$<PW_VAR>" -b "ou=users,<BASE_DN>" -LLL "(uid=rico)" entryUUID | grep -c entryUUID'
-# Erwartung: 1  (Konto liegt im LDAP -> Federation schreibt; entryUUID ist der stabile Schlüssel für OpenCloud)
 ```
+
+> Das OpenCloud-Konto von `rico` entsteht erst bei der ersten Anmeldung (D.9, Stolperstein 27) — die Gegenprobe dazu steht in D.10.
 
 ### Ergebnisprotokoll Block C
 
@@ -1268,11 +1319,10 @@ kubectl exec -n opencloud deploy/ldap-server -- sh -c \
 | `database keycloak` applied | true | |
 | Issuer über HTTPS | `https://keycloak.rm-it.org/realms/openCloud` | |
 | `/realms/master` und Admin-Host über HTTP-Listener | 404 / 404 | |
-| Personen im LDAP vor C.5 | 0 | |
+| Realm-Datei: Konten / Gruppen | `[0,0]` | |
 | Keycloak *Test connection* | Testmail angekommen | |
 | Einladungsmail an `rico` (Update Password, OTP) | angekommen, nicht im Spam | |
 | AdGuard-Auflösung | `192.168.178.224` | |
-| `uid=rico` mit `entryUUID` | 1 | |
 
 ---
 
@@ -1281,10 +1331,10 @@ kubectl exec -n opencloud deploy/ldap-server -- sh -c \
 ## D.1 — Eingangsprüfung
 
 ```bash
-kubectl get deploy -n opencloud keycloak ldap-server -o custom-columns=NAME:.metadata.name,READY:.status.readyReplicas
+kubectl get deploy -n opencloud keycloak -o custom-columns=NAME:.metadata.name,READY:.status.readyReplicas
 dig +short keycloak.rm-it.org @192.168.178.53
 grep -n 'Einladungsmail an `rico`' docs/rezepte/rezept-opencloud-pantheon.md
-# Erwartung: beide 1; 192.168.178.224; Ergebnisprotokoll C zeigt „angekommen"
+# Erwartung: 1; 192.168.178.224; Ergebnisprotokoll C zeigt „angekommen"
 ```
 
 ## D.2 — PVCs (`apps/pantheon/opencloud/opencloud/pvc.yaml`)
@@ -1321,7 +1371,7 @@ Aus Upstream `config/opencloud/` übernehmen, was `docker-compose.yml` mountet (
 
 > **⚠️ Stolperstein 21 — CSP mit falscher Domain.** Login-Weiterleitung oder Collabora-Fenster bleiben leer, die Browser-Konsole meldet „Content Security Policy". Ursache ist fast immer ein übrig gebliebener `*.opencloud.test`-Eintrag.
 
-## D.4 — OpenCloud-Deployment mit WOPI-Container (`apps/pantheon/opencloud/opencloud/deployment.yaml`)
+## D.4 — OpenCloud-Deployment (`apps/pantheon/opencloud/opencloud/deployment.yaml`)
 
 ```yaml
 apiVersion: apps/v1
@@ -1356,12 +1406,11 @@ spec:
             - cloud.rm-it.org
             - keycloak.rm-it.org
             - collabora.rm-it.org
-            - wopi.rm-it.org
       initContainers:
         - name: init
-          # Gleicher Tag wie die Container unten — Renovate hebt alle drei in einem PR.
+          # Gleicher Tag wie der Container unten — Renovate hebt beide in einem Pull Request.
           # renovate: datasource=docker depName=docker.io/opencloudeu/opencloud
-          image: docker.io/opencloudeu/opencloud:7.2.3
+          image: docker.io/opencloudeu/opencloud:7.2.5
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh", "-c"]
           args:
@@ -1381,7 +1430,7 @@ spec:
       containers:
         - name: opencloud
           # renovate: datasource=docker depName=docker.io/opencloudeu/opencloud
-          image: docker.io/opencloudeu/opencloud:7.2.3
+          image: docker.io/opencloudeu/opencloud:7.2.5
           imagePullPolicy: IfNotPresent
           command: ["opencloud"]
           args: ["server"]
@@ -1397,17 +1446,15 @@ spec:
               value: "false"
             - name: PROXY_HTTP_ADDR
               value: 0.0.0.0:9200
-            - name: GATEWAY_GRPC_ADDR
-              value: 0.0.0.0:9142        # wie Upstream; der WOPI-Container erreicht das Gateway
             - name: PROXY_ENABLE_BASIC_AUTH
               value: "false"
             - name: PROXY_ENABLE_APP_AUTH
               value: "true"              # App-Tokens (rclone-Migration)
             - name: PROXY_CSP_CONFIG_FILE_LOCATION
               value: /etc/opencloud/csp.yaml
-            # --- Externer IdP: Keycloak, Shared User Directory ---
+            # --- Externer IdP: Keycloak, Autoprovisioning ins eingebaute idm (Architekturentscheidung 3) ---
             - name: OC_EXCLUDE_RUN_SERVICES
-              value: idp,idm
+              value: idp                 # idm läuft (Kontenverzeichnis); nur der eingebaute IdP ist aus
             - name: OC_OIDC_ISSUER
               value: https://keycloak.rm-it.org/realms/openCloud
             - name: PROXY_OIDC_ACCESS_TOKEN_VERIFY_METHOD
@@ -1416,52 +1463,43 @@ spec:
               value: "true"
             - name: WEB_OPTION_ACCOUNT_EDIT_LINK_HREF
               value: https://keycloak.rm-it.org/realms/openCloud/account
-            - name: PROXY_USER_OIDC_CLAIM
-              value: uuid
-            - name: PROXY_USER_CS3_CLAIM
-              value: userid
             - name: PROXY_AUTOPROVISION_ACCOUNTS
-              value: "false"
+              value: "true"
+            - name: PROXY_USER_OIDC_CLAIM
+              value: sub                 # Keycloak-ID: stabil, auch wenn ein Konto umbenannt wird
+            - name: PROXY_AUTOPROVISION_CLAIM_USERNAME
+              value: sub
+            - name: PROXY_USER_CS3_CLAIM
+              value: username
             - name: PROXY_ROLE_ASSIGNMENT_DRIVER
               value: oidc
+            - name: PROXY_ROLE_ASSIGNMENT_OIDC_CLAIM
+              value: roles               # Realm-Rollen aus dem Client-Scope "roles" der Realm-Datei
             - name: OC_ADMIN_USER_ID
-              value: ""
+              value: ""                  # idm legt KEIN Admin-Konto an (Stolperstein 1)
             - name: SETTINGS_SETUP_DEFAULT_ASSIGNMENTS
               value: "false"
             - name: GRAPH_ASSIGN_DEFAULT_USER_ROLE
               value: "false"
             - name: GRAPH_USERNAME_MATCH
               value: none
-            # --- LDAP (Werte aus UPSTREAM.md, Service-Name wie Compose) ---
-            - name: OC_LDAP_URI
-              value: ldap://ldap-server:1389
-            - name: OC_LDAP_INSECURE
-              value: "true"              # clusterintern, kein TLS zum LDAP
-            - name: OC_LDAP_BIND_DN
-              value: cn=admin,dc=opencloud,dc=eu
-            - name: OC_LDAP_BIND_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: opencloud-secret
-                  key: ldap-admin-password
-            - name: OC_LDAP_SERVER_WRITE_ENABLED
-              value: "false"
-            - name: FRONTEND_READONLY_USER_ATTRIBUTES
+            - name: FRONTEND_READONLY_USER_ATTRIBUTES   # Profil und Rollen werden in Keycloak gepflegt
               value: user.onPremisesSamAccountName,user.displayName,user.mail,user.passwordProfile,user.accountEnabled,user.appRoleAssignments
-            - name: OC_LDAP_USER_BASE_DN
-              value: ou=users,dc=opencloud,dc=eu
-            - name: OC_LDAP_USER_SCHEMA_ID
-              value: entryUUID
-            - name: OC_LDAP_DISABLE_USER_MECHANISM
-              value: none
-            - name: OC_LDAP_GROUP_BASE_DN
-              value: ou=groups,dc=opencloud,dc=eu
-            - name: OC_LDAP_GROUP_SCHEMA_ID
-              value: entryUUID
-            - name: GRAPH_LDAP_GROUP_CREATE_BASE_DN
-              value: ou=custom,ou=groups,dc=opencloud,dc=eu
-            - name: GRAPH_LDAP_SERVER_UUID
-              value: "true"
+            # --- WOPI-Dienst collaboration im selben Prozess (Architekturentscheidung 5, wie Upstream weboffice/collabora.yml) ---
+            - name: COLLABORATION_WOPI_SRC
+              value: https://cloud.rm-it.org   # Proxy-Route /wopi
+            - name: COLLABORATION_APP_NAME
+              value: CollaboraOnline
+            - name: COLLABORATION_APP_PRODUCT
+              value: Collabora
+            - name: COLLABORATION_APP_ADDR
+              value: https://collabora.rm-it.org
+            - name: COLLABORATION_APP_ICON
+              value: https://collabora.rm-it.org/favicon.ico
+            - name: COLLABORATION_APP_INSECURE
+              value: "false"
+            - name: COLLABORATION_CS3API_DATAGATEWAY_INSECURE
+              value: "false"
             # --- Speicher: PosixFS (Default seit 2.0, hier explizit) ---
             - name: STORAGE_USERS_DRIVER
               value: posix
@@ -1473,9 +1511,9 @@ spec:
             - name: OC_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD
               value: "true"              # Default, explizit: öffentliche Links nur mit Passwort
             # --- Mail-Benachrichtigungen über IONOS (Architekturentscheidung 8) ---
-            # Der Dienst notifications ist per Default aus; Variablenname aus Teil 0.4 b.
-            - name: __ADD_SERVICES_VAR__
-              value: notifications
+            # Zusatzdienste: notifications (Mails) und collaboration (WOPI). Variablenname aus Teil 0.4 b.
+            - name: OC_ADD_RUN_SERVICES
+              value: notifications,collaboration
             - name: NOTIFICATIONS_SMTP_HOST
               value: smtp.ionos.de
             - name: NOTIFICATIONS_SMTP_PORT
@@ -1532,56 +1570,6 @@ spec:
             limits:
               memory: 3Gi
               cpu: "2"
-        - name: collaboration
-          # renovate: datasource=docker depName=docker.io/opencloudeu/opencloud
-          image: docker.io/opencloudeu/opencloud:7.2.3
-          imagePullPolicy: IfNotPresent
-          command: ["opencloud"]
-          args: ["collaboration", "server"]
-          env:
-            - name: OC_URL
-              value: https://cloud.rm-it.org
-            - name: MICRO_REGISTRY
-              value: nats-js-kv
-            - name: MICRO_REGISTRY_ADDRESS
-              value: 127.0.0.1:9233      # NATS des OpenCloud-Containers im selben Pod
-            - name: COLLABORATION_GRPC_ADDR
-              value: 0.0.0.0:9301
-            - name: COLLABORATION_HTTP_ADDR
-              value: 0.0.0.0:9300
-            - name: COLLABORATION_WOPI_SRC
-              value: https://wopi.rm-it.org
-            - name: COLLABORATION_APP_NAME
-              value: CollaboraOnline
-            - name: COLLABORATION_APP_PRODUCT
-              value: Collabora
-            - name: COLLABORATION_APP_ADDR
-              value: https://collabora.rm-it.org
-            - name: COLLABORATION_APP_ICON
-              value: https://collabora.rm-it.org/favicon.ico
-            - name: COLLABORATION_APP_INSECURE
-              value: "false"
-            - name: COLLABORATION_CS3API_DATAGATEWAY_INSECURE
-              value: "false"
-            - name: COLLABORATION_LOG_LEVEL
-              value: info
-          ports:
-            - name: wopi
-              containerPort: 9300
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-          volumeMounts:
-            - name: config
-              mountPath: /etc/opencloud
-              readOnly: true
-          resources:
-            requests:
-              memory: 64Mi
-              cpu: 25m
-            limits:
-              memory: 512Mi
       volumes:
         - name: config
           persistentVolumeClaim:
@@ -1594,9 +1582,7 @@ spec:
             name: opencloud-config-files
 ```
 
-> **Pflicht-Abgleich (Teil 0.4 b):** Claude Code vergleicht die `env`-Listen beider Container mit den Upstream-Compose-Dateien. Jede Variable, die Upstream setzt und hier fehlt (oder umgekehrt), wird entweder übernommen oder in `UPSTREAM.md` begründet. Erwartbare Unterschiede: Traefik-Labels, `INSECURE=true` (hier `false`), Service-Hostnamen.
-
-> **WOPI-Container startet vor NATS:** Beim ersten Start kann `collaboration` ein- bis zweimal neu starten, bis der OpenCloud-Container NATS bereitstellt. Dauerhaftes `CrashLoopBackOff` → STOPP (Hinweis: Registry-Adresse, `GATEWAY_GRPC_ADDR`).
+> **Pflicht-Abgleich (Teil 0.4 b):** Claude Code vergleicht die `env`-Liste des Containers mit den Upstream-Compose-Dateien (`docker-compose.yml`, `weboffice/collabora.yml`; für die Identität `idm/external-idp.yml` ohne die `OC_LDAP_*`-Zeilen). Jede Variable, die Upstream setzt und hier fehlt (oder umgekehrt), wird entweder übernommen oder in `UPSTREAM.md` begründet. Erwartbare Unterschiede: Traefik-Labels, `INSECURE=true` (hier `false`), Service-Hostnamen.
 
 `apps/pantheon/opencloud/opencloud/service.yaml`:
 
@@ -1613,19 +1599,6 @@ spec:
     - name: http
       port: 9200
       targetPort: 9200
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: wopi
-  namespace: opencloud
-spec:
-  selector:
-    app: opencloud
-  ports:
-    - name: wopi
-      port: 9300
-      targetPort: 9300
 ```
 
 ## D.5 — Collabora (`apps/pantheon/opencloud/collabora.yaml`)
@@ -1653,7 +1626,6 @@ spec:
       hostAliases:
         - ip: 192.168.178.224
           hostnames:
-            - wopi.rm-it.org
             - cloud.rm-it.org
       containers:
         - name: collabora
@@ -1662,7 +1634,7 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - name: aliasgroup1
-              value: https://wopi.rm-it.org:443
+              value: https://cloud.rm-it.org:443   # WOPI-Host = OpenCloud selbst (Pfad /wopi)
             - name: DONT_GEN_SSL_CERT
               value: "YES"
             - name: extra_params
@@ -1715,7 +1687,7 @@ spec:
 
 | Parameter | Warum |
 |---|---|
-| `aliasgroup1` | Nur dieser WOPI-Host darf Dokumente öffnen. |
+| `aliasgroup1` | Nur dieser WOPI-Host (OpenCloud selbst, Pfad `/wopi`) darf Dokumente öffnen. |
 | `ssl.enable=false`, `ssl.termination=true` | TLS endet am Gateway bzw. bei Cloudflare; Collabora erzeugt trotzdem `https`-URLs. |
 | `admin_console.enable=false` | Die Collabora-Admin-Konsole wäre öffentlich erreichbar — sie wird nicht gebraucht, also aus. Spart zugleich ein Admin-Passwort. |
 | `net.frame_ancestors` | Collabora darf nur in OpenCloud eingebettet werden. |
@@ -1760,22 +1732,6 @@ spec:
       backendRefs:
         - name: collabora
           port: 9980
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: wopi
-  namespace: opencloud
-spec:
-  parentRefs:
-    - name: pantheon-gateway
-      namespace: default
-  hostnames:
-    - wopi.rm-it.org
-  rules:
-    - backendRefs:
-        - name: wopi
-          port: 9300
 ```
 
 > **⚠️ Stolperstein 8 — Route-Timeout bei großen Dateien.** Envoy bricht eine Antwort ab, die länger dauert als das Route-Timeout — bei einem mehrere GB großen Download ist das der Normalfall, nicht die Ausnahme. Deshalb hier vorsorglich `0s` (anders als bei AFFiNE, wo es nur bei Symptomen eingebaut wird). Geprüft in D.9.
@@ -1786,7 +1742,7 @@ In `renovate.json` unter `packageRules` anhängen:
 
 ```json
 {
-  "description": "OpenCloud: nur Production-Image mit reinen X.Y.Z-Tags (nie opencloud-rolling, nie latest). init, opencloud und collaboration stehen im selben Deployment und werden gemeinsam angehoben. Minor/Major nur nach Teil L.",
+  "description": "OpenCloud: nur Production-Image mit reinen X.Y.Z-Tags (nie opencloud-rolling, nie latest). init und opencloud stehen im selben Deployment und werden gemeinsam angehoben. Minor/Major nur nach Teil L.",
   "matchPackageNames": ["docker.io/opencloudeu/opencloud"],
   "allowedVersions": "/^\\d+\\.\\d+\\.\\d+$/"
 },
@@ -1826,15 +1782,15 @@ kubectl rollout status deploy/opencloud -n opencloud --timeout=15m
 kubectl rollout status deploy/collabora -n opencloud --timeout=10m
 kubectl logs -n opencloud deploy/opencloud -c init
 # Erwartung (erster Start): Ausgabe von "opencloud init" ohne Fehler. Bei späteren Starts: "init uebersprungen".
-kubectl logs -n opencloud deploy/opencloud -c opencloud --since=15m | grep -i 'notification' | head -10
-# Erwartung: Dienst notifications gestartet; keine Zeilen mit smtp/auth-Fehlern
+kubectl logs -n opencloud deploy/opencloud -c opencloud --since=15m | grep -iE 'notification|collaboration' | head -10
+# Erwartung: Dienste notifications und collaboration gestartet; keine Zeilen mit smtp/auth-Fehlern
 ```
 
 **Prüfungen:**
 
 ```bash
 GW=192.168.178.224
-R="--resolve cloud.rm-it.org:443:$GW --resolve collabora.rm-it.org:443:$GW --resolve wopi.rm-it.org:443:$GW"
+R="--resolve cloud.rm-it.org:443:$GW --resolve collabora.rm-it.org:443:$GW"
 
 # 1. Server antwortet, Version stimmt
 curl -s $R https://cloud.rm-it.org/status.php | jq -c '{installed, productversion, version}'
@@ -1855,8 +1811,8 @@ kubectl exec -n opencloud deploy/opencloud -c opencloud -- \
 
 # 5. Collabora-Discovery und WOPI-Route
 curl -s -o /dev/null -w "%{http_code}\n" $R https://collabora.rm-it.org/hosting/discovery
-curl -s -o /dev/null -w "%{http_code}\n" $R https://wopi.rm-it.org/
-# Erwartung: 200; ein HTTP-Code (kein Verbindungsfehler)
+curl -s -o /dev/null -w "%{http_code}\n" $R https://cloud.rm-it.org/wopi/
+# Erwartung: 200; ein HTTP-Code des WOPI-Dienstes (kein 502/503, kein Verbindungsfehler)
 
 # 6. Routen akzeptiert
 kubectl get httproute -n opencloud \
@@ -1867,12 +1823,13 @@ kubectl get httproute -n opencloud \
 
 > **⏸ HALT [Rico]** — am Mac im Heimnetz, Browser:
 > 1. `https://cloud.rm-it.org` → Weiterleitung zu Keycloak → `rico` + Passwort + OTP (eingerichtet in C.5) → zurück in OpenCloud.
-> 2. Kontrolle: **„Meine Dateien"** vorhanden (sonst Stolperstein 2: Rolle fehlt). Oben rechts Benutzermenü → Rolle *Admin*.
+> 2. Kontrolle: **„Meine Dateien"** vorhanden (sonst Stolperstein 2: Rolle fehlt). Oben rechts Benutzermenü → Rolle *Admin*. **Administration → Benutzer:** genau ein Eintrag `rico` — kein `admin`, keine Demo-Konten (Stolperstein 1).
 > 3. **Administration → Benutzer → rico:** Kontingent **unbegrenzt** (oder mindestens `__DATA_SIZE__`). Sonst hier setzen — die Migration würde sonst am Kontingent scheitern.
 > 4. **Neu → Dokument (.docx)** → öffnet sich in Collabora, Text tippen, schließen, erneut öffnen.
 > 5. **Großdatei-Test:** eine Datei > 1 GB hochladen (Browser), danach wieder herunterladen. Beides muss ohne Abbruch durchlaufen.
 > 6. **Benachrichtigungs-Test** mit einem Testkonto, dessen Mail über die IONOS-Weiterleitung bei dir landet:
 >    - Keycloak-Administration → Realm **openCloud** → *Users* → **Add user**: Username `testgast`, E-Mail `noreply@rm-it.org`, Rolle `opencloudGuest` (Default prüfen) → *Credentials* → Passwort setzen, Temporary aus.
+>    - **`testgast` meldet sich einmal an** (privates Browserfenster, `https://cloud.rm-it.org`) und wieder ab — erst danach existiert das Konto in OpenCloud (Stolperstein 27). Dabei prüfen: kein „Meine Dateien" (Gast), Benutzerliste zeigt jetzt `rico` und `testgast`.
 >    - In OpenCloud einen Ordner `_test-freigabe` anlegen → *Teilen* → `testgast` → „Kann ansehen".
 >    - Erwartung: Mail „… hat … mit dir geteilt" von `Pantheon Cloud <noreply@rm-it.org>` kommt über die Weiterleitung an deiner privaten Adresse an.
 >    - `testgast` bleibt bis Block I für weitere Tests bestehen (in Keycloak *Enabled* aus, wenn nicht gebraucht).
@@ -1883,7 +1840,6 @@ kubectl get httproute -n opencloud \
 
 ```bash
 kubectl logs -n opencloud deploy/opencloud -c opencloud --since=30m | grep -ciE '"level":"(error|fatal)"'
-kubectl logs -n opencloud deploy/opencloud -c collaboration --since=30m | grep -ciE '"level":"(error|fatal)"'
 # Erwartung: 0 oder wenige erklärbare Einträge — Zeilen bei Bedarf zeigen
 
 # Wo liegt Ricos persönlicher Space im PosixFS-Baum? (lesend; gebraucht in Block F/G)
@@ -1907,6 +1863,7 @@ kubectl exec -n opencloud deploy/opencloud -c opencloud -- sh -c 'ls -la /var/li
 | Upload/Download > 1 GB | ok | |
 | Freigabe-Mail an `testgast` (über Weiterleitung) | angekommen | |
 | `SPACE_PATH` | Pfad | |
+| Benutzerliste (Autoprovisioning) | `rico`, `testgast`; kein `admin` | |
 
 ---
 
@@ -1928,8 +1885,8 @@ curl -s --resolve keycloak.rm-it.org:443:$GW \
 jq -r '[.registrationAllowed, .bruteForceProtected] | @tsv' apps/pantheon/opencloud/keycloak/opencloud-realm.json
 # Erwartung: false  true
 
-# 3. Personen im LDAP = nur bewusst angelegte (rico, testgast)
-#    (Befehl aus C.4/4 mit Ausgabe der uids statt Zählung)
+# 3. Konten = nur bewusst angelegte: Realm-Datei ohne Konten/Gruppen (C.4/4: [0,0]);
+#    OpenCloud-Benutzerliste laut Ergebnisprotokoll D: rico, testgast, kein admin
 
 # 4. Admin-Pfade über den Tunnel-Pfad gesperrt (wie C.4/2)
 # 5. Öffentliche Links verlangen Passwort (Env in D.4)
@@ -1943,7 +1900,7 @@ kubectl get deploy opencloud -n opencloud -o jsonpath='{.spec.template.spec.cont
 
 > **⏸ HALT [Rico]** — im eigenen Terminal:
 > ```bash
-> for h in keycloak cloud collabora wopi; do
+> for h in keycloak cloud collabora; do
 >   cloudflared tunnel route dns pantheon-apps "$h.rm-it.org"
 > done
 > # keycloak-admin bekommt bewusst KEINEN öffentlichen Eintrag.
@@ -2013,6 +1970,13 @@ dig +short keycloak-admin.rm-it.org @1.1.1.1
 | | Geteilte Ordner, die **anderen** gehören, bleiben bei deren Besitzern | Inhalt wird kopiert; die Zusammenarbeit läuft künftig über eine OpenCloud-Freigabe (I.4) |
 
 Ziel ist die **Wurzel von Ricos persönlichem Space** — die Ordnerstruktur sieht danach aus wie in Dropbox.
+
+**Eingangsprüfung Speicher** (STOPP, wenn nicht erfüllt):
+
+```bash
+grep -n '| Freier Speicher nach 0.6 |' docs/rezepte/rezept-opencloud-pantheon.md
+# Erwartung: Ist-Spalte gefüllt und >= 3,6 TB (Teil 0.6). Leer oder kleiner -> STOPP, Rico an 0.6 erinnern.
+```
 
 ## F.1 — ⏸ HALT: Zugänge für die Migration *(Rico, ~20 Min)*
 
@@ -2323,30 +2287,30 @@ kubectl logs -n opencloud job/mig-check-1 | sed -n '/== Zusammenfassung ==/,$p'
 
 ```bash
 # PVC -> PV -> QNAP-LUN-Name (für die Snapshot-Planung)
-for p in opencloud-data opencloud-config ldap-data; do
+for p in opencloud-data opencloud-config; do
   pv=$(kubectl get pvc -n opencloud "$p" -o jsonpath='{.spec.volumeName}')
   printf "%-18s %s %s\n" "$p" "$pv" "$(kubectl get pv "$pv" -o jsonpath='{.spec.csi.volumeAttributes.internalName}')"
 done
 
 # Verzeichnisse auf dem Daten-PVC -> Ausschlüsse festlegen
 kubectl exec -n opencloud deploy/opencloud -c opencloud -- sh -c 'du -sh /var/lib/opencloud/* 2>/dev/null'
-# Erwartung: storage (groß), daneben z. B. thumbnails, search, nats.
+# Erwartung: storage (groß), daneben z. B. idm, thumbnails, search, nats. idm NIE ausschließen (Konten, Architekturentscheidung 3).
 # Ausschließen: Thumbnails (neu erzeugbar) und laufende Uploads (storage/users/uploads o. ä.) — tatsächliche Namen notieren.
 ```
 
-Claude Code nennt Rico im HALT die drei LUN-Namen.
+Claude Code nennt Rico im HALT die zwei LUN-Namen.
 
 ## H.2 — ⏸ HALT: Off-site-Ziel und Snapshots *(Rico, ~20 Min)*
 
 > **⏸ HALT [Rico]**
 >
-> **1. Hetzner Storage Box → Sub-Account anlegen** (`u620152-sub2`), Basisverzeichnis z. B. `opencloud-backup`, **SSH-Support und externe Erreichbarkeit an**. Freien Speicher der Box notieren (Bestand ≈ `DROPBOX_GB` + Archiv).
+> **1. Hetzner Storage Box → Sub-Account anlegen** (`u620152-sub3`), Basisverzeichnis z. B. `opencloud-backup`, **SSH-Support und externe Erreichbarkeit an**. Freien Speicher der Box notieren (Bestand ≈ `DROPBOX_GB` + Archiv).
 >
 > **2. Schlüssel und Passwörter** (eigenes Terminal):
 > ```bash
 > ssh-keygen -t ed25519 -N "" -C "pantheon-opencloud-offsite" -f ~/.ssh/id_ed25519_hetzner_opencloud
-> cat ~/.ssh/id_ed25519_hetzner_opencloud.pub | ssh -p 23 u620152-sub2@u620152.your-storagebox.de install-ssh-key
-> ssh -p 23 -i ~/.ssh/id_ed25519_hetzner_opencloud -o PasswordAuthentication=no u620152-sub2@u620152.your-storagebox.de ls
+> cat ~/.ssh/id_ed25519_hetzner_opencloud.pub | ssh -p 23 u620152-sub3@u620152.your-storagebox.de install-ssh-key
+> ssh -p 23 -i ~/.ssh/id_ed25519_hetzner_opencloud -o PasswordAuthentication=no u620152-sub3@u620152.your-storagebox.de ls
 > # Erwartung: Login OHNE Passwortabfrage (Paperless-Lehre: sonst ist die Key-Auth nicht wirklich aktiv)
 >
 > CRYPT1=$(openssl rand -hex 32); CRYPT2=$(openssl rand -hex 32)
@@ -2372,7 +2336,7 @@ Claude Code nennt Rico im HALT die drei LUN-Namen.
 >     [storagebox]
 >     type = sftp
 >     host = u620152.your-storagebox.de
->     user = u620152-sub2
+>     user = u620152-sub3
 >     port = 23
 >     key_file = /work/id_ed25519
 >     shell_type = none
@@ -2394,7 +2358,7 @@ Claude Code nennt Rico im HALT die drei LUN-Namen.
 > # Erwartung: >= 2
 > ```
 >
-> **4. QNAP → Speicher & Snapshots** → für die drei von Claude Code genannten LUNs: **Snapshot-Zeitplan täglich, Aufbewahrung 14 Tage**. Snapshot-Reserve im Pool prüfen.
+> **4. QNAP → Speicher & Snapshots** → für die zwei von Claude Code genannten LUNs: **Snapshot-Zeitplan täglich, Aufbewahrung 14 Tage**. Snapshot-Reserve im Pool prüfen.
 >
 > **Fortsetzungssatz:** „Off-site-Secret und Snapshots eingerichtet, weiter mit H.3."
 
@@ -2420,7 +2384,6 @@ data:
     DAY=$(date +%F)
     case "$MODE" in
       backup)
-        test -s /work/ldap/opencloud.ldif || { echo "LDAP-Export leer"; exit 3; }
         rclone sync /data offsite:data \
           --exclude "/thumbnails/**" --exclude "/storage/users/uploads/**" \
           --backup-dir "offsite:archive/$DAY/data" \
@@ -2428,7 +2391,6 @@ data:
           --bwlimit "08:00,4M 23:30,off" \
           --stats 15m --stats-one-line --stats-log-level NOTICE
         rclone sync /config offsite:config --backup-dir "offsite:archive/$DAY/config"
-        rclone sync /work/ldap offsite:ldap --backup-dir "offsite:archive/$DAY/ldap"
         rclone delete offsite:archive --min-age 30d --rmdirs
         date -u +%FT%TZ > /work/last-success
         rclone copyto /work/last-success offsite:last-success
@@ -2484,30 +2446,6 @@ spec:
                     matchLabels:
                       app: opencloud
                   topologyKey: kubernetes.io/hostname
-          initContainers:
-            - name: ldap-dump
-              image: <LDAP-Image wie in ldap.yaml>    # enthält ldapsearch
-              command: ["/bin/sh", "-c"]
-              args:
-                - |
-                  mkdir -p /work/ldap
-                  # "+" exportiert Betriebsattribute inkl. entryUUID -> per slapadd UUID-treu wiederherstellbar
-                  ldapsearch -x -H ldap://ldap-server:<PORT> -D "<ADMIN_DN>" -w "$LDAP_PW" \
-                    -b "<BASE_DN>" -LLL "(objectClass=*)" "*" "+" > /work/ldap/opencloud.ldif
-                  grep -c "^dn:" /work/ldap/opencloud.ldif
-              env:
-                - name: LDAP_PW
-                  valueFrom:
-                    secretKeyRef:
-                      name: opencloud-secret
-                      key: ldap-admin-password
-              securityContext:
-                allowPrivilegeEscalation: false
-                capabilities:
-                  drop: ["ALL"]
-              volumeMounts:
-                - name: work
-                  mountPath: /work
           containers:
             - name: rclone
               # renovate: datasource=docker depName=docker.io/rclone/rclone
@@ -2562,14 +2500,14 @@ spec:
               emptyDir: {}
 ```
 
-`opencloud-offsite-verify`: gleiche Vorlage, `suspend: true`, `MODE=verify`, ohne `ldap-dump`-initContainer.
+`opencloud-offsite-verify`: gleiche Vorlage, `suspend: true`, `MODE=verify`.
 
 ```bash
 kubectl kustomize apps/pantheon/opencloud/ > /dev/null && echo BUILD_OK
-grep -rn '__[A-Z_]*__\|<LDAP-Image\|<PORT>\|<ADMIN_DN>\|<BASE_DN>' apps/pantheon/opencloud/ || echo NO_PLACEHOLDERS
+grep -rn '__[A-Z_]*__' apps/pantheon/opencloud/ || echo NO_PLACEHOLDERS
 O=apps/pantheon/opencloud
 git add "$O/backup" "$O/kustomization.yaml"
-git commit -m "feat(opencloud): add nightly encrypted offsite backup with ldap export"
+git commit -m "feat(opencloud): add nightly encrypted offsite backup"
 git show --stat HEAD                   # Rico zeigen, Freigabe abwarten
 git pull --rebase && git push
 flux reconcile kustomization flux-system --with-source
@@ -2577,9 +2515,8 @@ flux reconcile kustomization flux-system --with-source
 # Erstlauf sofort anstoßen (dauert bei 1,5–3 TB Tage; Hochrechnung aus Teil 0.5; nachts ohne Bandbreitenlimit)
 kubectl create job -n opencloud --from=cronjob/opencloud-offsite offsite-initial
 kubectl wait -n opencloud --for=condition=Ready pod -l job-name=offsite-initial --timeout=10m
-kubectl logs -n opencloud job/offsite-initial -c ldap-dump
 kubectl logs -n opencloud job/offsite-initial -c rclone --tail=5
-# Erwartung: Anzahl LDAP-Einträge > 0; rclone überträgt
+# Erwartung: rclone überträgt
 ```
 
 > Ein nächtlicher Lauf, der in den noch laufenden Erstlauf fällt, wird wegen `concurrencyPolicy: Forbid` übersprungen — gewollt.
@@ -2602,15 +2539,14 @@ kubectl logs -n opencloud job/offsite-verify-1
 | Einzelne Datei versehentlich gelöscht | OpenCloud-Papierkorb; sonst QNAP-Snapshot (LUN klonen, Datei herausholen) oder `offsite:archive/<Tag>/data/…` |
 | Datei-Version gestern | OpenCloud-Versionen; sonst `offsite:archive/<Tag>` |
 | Daten-LUN defekt, QNAP lebt | QNAP-Snapshot zurückrollen (OpenCloud vorher auf 0 skalieren) → vollständig inkl. Freigaben |
-| QNAP verloren | Neue Instanz nach diesem Rezept; `offsite:config` nach `/etc/opencloud`, LDAP per `slapadd` aus `offsite:ldap` (UUIDs bleiben gleich), Keycloak-DB per Barman; Dateien aus `offsite:data` in den Space-Pfad kopieren, OpenCloud starten → **Assimilation**. Freigaben und Versionen sind verloren, Dateien vollständig. |
+| QNAP verloren | Neue Instanz nach diesem Rezept; `offsite:config` nach `/etc/opencloud` und `offsite:data/idm` nach `/var/lib/opencloud/idm` (gleicher Stand wie die Config — Konten behalten ihre IDs), Keycloak-DB per Barman; Dateien aus `offsite:data` in den Space-Pfad kopieren, OpenCloud starten → **Assimilation**. Freigaben und Versionen sind verloren, Dateien vollständig. |
 
 ### Ergebnisprotokoll Block H
 
 | Prüfpunkt | Erwartung | Ist |
 |---|---|---|
-| LUN-Namen (3) | — | |
+| LUN-Namen (2) | — | |
 | QNAP-Snapshot-Zeitpläne | täglich, 14 Tage | |
-| LDAP-Export Einträge | > 0 | |
 | Erstlauf Dauer | — | |
 | Restore-Probe Config / Daten | OK / OK | |
 
@@ -2673,13 +2609,13 @@ Kein Claude-Code-Schritt, sondern Ricos Vorgehen für jede Person, die dauerhaft
 3. *Credentials* → **Credential reset** → Aktion **Update Password** → *Send email*. Der Gast bekommt eine Mail von `Pantheon Cloud <noreply@rm-it.org>` mit einem Link (72 h gültig), über den er sein Passwort selbst setzt. Rico kennt das Passwort nie.
 4. Zwei-Faktor **nicht** erzwingen. Wer möchte, richtet es selbst im Konto ein (Anleitung unten, Schritt 5).
 
-> Das Konto landet über die LDAP-Federation sofort im Verzeichnis — der Gast ist im Teilen-Dialog von OpenCloud direkt auffindbar, auch bevor er sich zum ersten Mal angemeldet hat.
+> **Erst anmelden, dann teilen (Stolperstein 27):** OpenCloud legt das Konto erst bei der ersten Anmeldung an. Vorher findet der Teilen-Dialog den Gast nicht. Also: Einladung schicken → Gast setzt sein Passwort und meldet sich einmal unter `https://cloud.rm-it.org` an → dann Schritt 2. Wer sofort etwas braucht, bekommt bis dahin einen öffentlichen Link.
 
 > Ist der Link abgelaufen: Schritt 3 wiederholen. Kommt die Mail nicht an: Spam-Ordner des Gasts; Rico prüft in Keycloak *Realm settings → Email → Test connection*.
 
 **2. Ordner teilen** — in OpenCloud am Ordner (z. B. `Band`) → *Teilen* → Namen des Gasts suchen → Berechtigung **„Kann bearbeiten"** (hoch- und herunterladen, umbenennen, löschen) oder **„Kann ansehen"** → *Teilen*. OpenCloud schickt dem Gast dazu eine Benachrichtigung von `noreply@rm-it.org`.
 
-> Teilt man einen Ordner mit mehreren Gästen, lohnt eine Gruppe: *OpenCloud → Administration → Gruppen* (landet im beschreibbaren `ou=custom`-Zweig) → Gruppe `band` anlegen, Gäste hinzufügen, den Ordner einmal mit der Gruppe teilen. Neue Mitglieder sehen dann automatisch alles.
+> Teilt man einen Ordner mit mehreren Gästen, lohnt eine Gruppe: *OpenCloud → Administration → Gruppen* (liegt im eingebauten Verzeichnis `idm`) → Gruppe `band` anlegen, Gäste hinzufügen, den Ordner einmal mit der Gruppe teilen. Neue Mitglieder sehen dann automatisch alles.
 
 **3. Anleitung schicken** — Text zum Kopieren (per Messenger oder Mail):
 
@@ -2692,7 +2628,8 @@ So kommst du ran:
      Falls nicht: bitte im Spam-Ordner nachsehen.
    - Link in der Mail öffnen (gilt 3 Tage) und ein eigenes Passwort setzen
      (am besten lang und zufällig).
-   - Danach https://cloud.rm-it.org öffnen und anmelden.
+   - Danach https://cloud.rm-it.org öffnen und einmal anmelden.
+     Erst dann kann ich dir den Ordner freigeben - sag mir kurz Bescheid.
 
 2. Im Browser
    - Links auf "Mit mir geteilt" (bzw. "Freigaben") klicken
@@ -2726,7 +2663,7 @@ bekommt einen eigenen Zugang.
 
 > **Antworten an `noreply@`:** Die IONOS-Weiterleitung schickt sie an Ricos private Adresse — es geht nichts verloren, aber der Hinweis im Text spart Umwege.
 
-**Gast entfernen** (z. B. Bandwechsel): *Keycloak → Users → Gast → Enabled aus* (sofort keine Anmeldung mehr), danach in OpenCloud die Freigaben bzw. die Gruppenmitgliedschaft entfernen. Hat der Gast App-Tokens erzeugt, diese in OpenCloud löschen (Stolperstein 14). Konto erst löschen, wenn sicher ist, dass er nicht zurückkommt.
+**Gast entfernen** (z. B. Bandwechsel): *Keycloak → Users → Gast → Enabled aus* (sofort keine Anmeldung mehr), danach in OpenCloud die Freigaben bzw. die Gruppenmitgliedschaft entfernen. Hat der Gast App-Tokens erzeugt, diese in OpenCloud löschen (Stolperstein 14). Konto erst löschen, wenn sicher ist, dass er nicht zurückkommt — **in beiden Systemen**: Keycloak → Users → Delete und OpenCloud → Administration → Benutzer → Löschen (Stolperstein 28).
 
 ### Ergebnisprotokoll Block I
 
@@ -2750,7 +2687,7 @@ bekommt einen eigenen Zugang.
 | 1 | ≥ 30 Tage Alltag nur mit OpenCloud, ohne Rückgriff auf Dropbox | Ricos Einschätzung |
 | 2 | Off-site-Backup ≥ 7 Nächte in Folge erfolgreich | `kubectl get jobs -n opencloud -l job-name` / `last-success` |
 | 3 | Restore-Probe grün (H.4), höchstens 7 Tage alt | `opencloud-offsite-verify` |
-| 4 | QNAP-Snapshots für alle drei LUNs vorhanden | QNAP-Oberfläche |
+| 4 | QNAP-Snapshots für beide LUNs (`opencloud-data`, `opencloud-config`) vorhanden | QNAP-Oberfläche |
 | 5 | Schluss-Check aus I.2 grün | Ergebnisprotokoll I |
 | 6 | Alle Geräte, Apps mit Dropbox-Sync und Freigaben umgestellt | Ergebnisprotokoll I |
 | 7 | Mindestens ein Gast hat sich per Einladungsmail selbst angemeldet | Ergebnisprotokoll I |
@@ -2761,8 +2698,9 @@ bekommt einen eigenen Zugang.
 3. Dropbox-App auf iPhone/iPad löschen (Kamera-Upload ist seit I.1 aus).
 4. In Dropbox unter *Einstellungen → Verbundene Apps* die App `pantheon-migration` entfernen; in der Developer-Konsole löschen.
 5. In OpenCloud den App-Token `rclone-migration` löschen.
-6. **Dropbox-Abo kündigen** (Tarif auf Basic herabstufen). Das Konto bleibt mit dem Bestand lesbar, synchronisiert aber nicht mehr, sobald es über dem Basic-Kontingent liegt — als letzte Rückfallebene für einige Wochen.
-7. **Konto löschen** ist unumkehrbar und ein eigener, späterer Schritt — frühestens nach dem nächsten Monats-Wartungsfenster mit grüner Restore-Probe.
+6. **QNAP → HBS 3 → Synchronisieren:** den Auftrag Dropbox → *PrivateCloud* deaktivieren (nicht löschen), damit er nach der Herabstufung nicht mit Fehlern läuft.
+7. **Dropbox-Abo kündigen** (Tarif auf Basic herabstufen). Das Konto bleibt mit dem Bestand lesbar, synchronisiert aber nicht mehr, sobald es über dem Basic-Kontingent liegt — als letzte Rückfallebene für einige Wochen.
+8. **Konto löschen** ist unumkehrbar und ein eigener, späterer Schritt — frühestens nach dem nächsten Monats-Wartungsfenster mit grüner Restore-Probe. Im selben Schritt das QNAP-Volume *PrivateCloud* entfernen (gibt ≈ 1,34 TB frei) und den HBS-3-Auftrag löschen.
 
 **Danach — Claude Code** (Startprompt „Führe J.1 aus"):
 
@@ -2854,8 +2792,8 @@ Den ermittelten Befehl **einmal** per `kubectl exec` starten (Freigabe-Klick). E
 |---|---|---|
 | Dateien, Metadaten, Freigaben, Versionen | PVC `opencloud-data` | QNAP-Snapshot (voll) + Off-site crypt (Dateien) |
 | Interne Secrets und IDs | PVC `opencloud-config` | QNAP-Snapshot + Off-site crypt |
-| Konten (LDAP, `entryUUID`) | PVC `ldap-data` | QNAP-Snapshot + nächtlicher LDIF-Export off-site |
-| Keycloak (Clients, OTP-Geräte, Sessions) | DB `keycloak` | Barman (WAL + täglich) |
+| OpenCloud-Konten (`idm/idm.boltdb`) | PVC `opencloud-data` | QNAP-Snapshot + Off-site crypt (mit dem Dateibaum) |
+| Keycloak (Konten, Passwörter, OTP-Geräte, Clients, Sessions) | DB `keycloak` | Barman (WAL + täglich) |
 | Manifeste, Realm-Anfangszustand, CSP | Git | Git |
 | Grund-Secrets, SMTP-Passwort | SOPS | Git (verschlüsselt) |
 | SMTP-Einstellungen von Keycloak (nach Import) | DB `keycloak` | Barman |
@@ -2869,10 +2807,9 @@ Den ermittelten Befehl **einmal** per `kubectl exec` starten (Freigabe-Klick). E
 | Keycloak | Merge, Login testen | On-Demand-Barman-Backup direkt vor dem Merge (DB-Migration ohne Rückweg) |
 | Collabora | Merge, `.docx` öffnen | dto. |
 | Tika | Merge, Suche nach einem Wort aus einem PDF | dto. |
-| OpenLDAP | Merge, `ldapsearch`-Zählung | Release-Notes; LDIF-Export der letzten Nacht vorhanden? |
 | rclone | Merge; nächsten Off-site-Lauf prüfen | dto. |
 
-**Grundsätze** (wie AFFiNE F.2): Tags gepinnt, `IfNotPresent`, Renovate-Regeln aus D.7. `init`, `opencloud` und `collaboration` tragen **immer denselben Tag** — Renovate hebt alle drei Zeilen im selben PR; beim manuellen Editieren alle drei ändern.
+**Grundsätze** (wie AFFiNE F.2): Tags gepinnt, `IfNotPresent`, Renovate-Regeln aus D.7. `init` und `opencloud` tragen **immer denselben Tag** — Renovate hebt beide Zeilen im selben Pull Request; beim manuellen Editieren beide ändern.
 
 ## L.3 — Rückweg bei misslungenem OpenCloud-Upgrade
 
@@ -2901,8 +2838,8 @@ Den ermittelten Befehl **einmal** per `kubectl exec` starten (Freigabe-Klick). E
 
 | # | Punkt | Umsetzung |
 |---|---|---|
-| 1 | Routing über Gateway API | Fünf HTTPRoutes; Admin-Route nur am HTTPS-Listener; Timeouts `0s` für OpenCloud/Collabora |
-| 2 | StorageClass `qnap-iscsi` | `opencloud-data`, `opencloud-config`, `ldap-data` |
+| 1 | Routing über Gateway API | Vier HTTPRoutes (keycloak, keycloak-admin, opencloud, collabora); Admin-Route nur am HTTPS-Listener; Timeouts `0s` für OpenCloud/Collabora |
+| 2 | StorageClass `qnap-iscsi` | `opencloud-data`, `opencloud-config` |
 | 3 | PostgreSQL-Connection | DB `keycloak` in `pantheon-pg`, Rolle + DB deklarativ |
 | 4 | Frische SOPS-Secrets | `keycloak-db-role`, `opencloud-secret`, `opencloud-smtp`, `cloudflare-api-token`, `opencloud-migration` (temporär), `opencloud-offsite` |
 | 5 | PodSecurity | Namespace `baseline` (Collabora-Capability, dokumentiert); alle übrigen Container `runAsNonRoot`, `drop: ALL`, `RuntimeDefault` |
@@ -2913,7 +2850,7 @@ Den ermittelten Befehl **einmal** per `kubectl exec` starten (Freigabe-Klick). E
 | # | Punkt | Nachweis |
 |---|---|---|
 | 7 | HTTPS im LAN, gültiges Zertifikat | Block B |
-| 8 | Login über Keycloak mit OTP, Registrierung aus, keine Demo-Konten | C.4, C.5, E.1 |
+| 8 | Login über Keycloak mit OTP, Registrierung aus, keine Demo-Konten, kein OpenCloud-Admin-Konto `admin` | C.4, C.5, D.9, E.1 |
 | 9 | Keycloak-Admin nur im LAN, `master` nicht öffentlich | C.4, E.3 |
 | 10 | Browser, Desktop, iOS von außen ohne Access-OTP | E.4 |
 | 11 | Uploads > 100 MB über Cloudflare, Downloads > 1 GB im LAN | D.9, E.4 |
@@ -2943,6 +2880,12 @@ Reihenfolge = empfohlene Priorität, jeweils mit dem Risiko bis dahin.
 ---
 
 ## Rezept-Changelog
+
+**1.2 (16.11.2026)** — Ergebnisse aus Teil 0, Entscheidungen Rico vom selben Tag.
+- **Identität (Architekturentscheidung 3 neu):** Autoprovisioning ins eingebaute OpenCloud-Verzeichnis `idm` statt Keycloak + OpenLDAP. Grund: einziges Upstream-LDAP-Image `bitnamilegacy/openldap:2.6` seit 19.08.2025 ohne Updates. C.3.1 (OpenLDAP), LDAP-Passwort in A.2, LDAP-Prüfungen in C.4/C.6/E.1, LDAP-Export in H und `ldap-data` entfallen. Realm-Datei aus `opencloud-realm-autoprovisioning.dist.json` (Konten und Gruppen geleert, `opencloudGuest` als Default-Rolle). D.4 mit `PROXY_AUTOPROVISION_ACCOUNTS=true`, `sub` als Benutzerkennung, Rollen aus Claim `roles`, `OC_EXCLUDE_RUN_SERVICES=idp`. Neue Stolpersteine 27 (Konto erst nach erster Anmeldung) und 28 (Konten in zwei Systemen); Stolperstein 1 auf die Realm-Datei umgeschrieben; D.9 prüft die Benutzerliste (kein `admin`).
+- **WOPI (Architekturentscheidung 5):** `collaboration` als Dienst im OpenCloud-Prozess unter `https://cloud.rm-it.org/wopi` (wie Upstream). Hostname `wopi.rm-it.org`, WOPI-Container, Service und Route entfallen; Collabora `aliasgroup1` auf `cloud.rm-it.org`.
+- **Neu 0.6 (Rico):** Speicher im QNAP-Pool freiräumen (Transfer löschen, Abyss Of Hel und TimeMachine verkleinern, UrdaSot verschlüsselt auf die Storage Box archivieren und löschen). Teil 0 hatte 2,5 TB frei gegen 3,6 TB Bedarf gemessen. Block F prüft das als Eingang; das Archiv belegt voraussichtlich den Storage-Box-Sub-Account `u620152-sub2`, Block H nutzt deshalb `u620152-sub3`; Block J deaktiviert den HBS-3-Spiegel PrivateCloud und entfernt das Volume mit dem Konto-Löschen.
+- **Korrekturen:** OpenCloud-Tag 7.2.3 → 7.2.5; Laufzeitformel in 0.5 mit × 8000 statt × 8 (GB → Mbit).
 
 **1.1 (16.11.2026)** — Abgleich mit dem Cluster, Systemmails über IONOS, Fokus Dropbox-Ablösung.
 - **Repo-Stand eingearbeitet** (Commit `1a72f8c`): Ablage unter `docs/rezepte/`, `CLAUDE.md` „Laufendes Vorhaben" wird in Teil 0.1 auf OpenCloud umgestellt; Regeln aus `CLAUDE.md` und `.claude/settings.json` übernommen (kein `sops`, kein `cloudflared` für Claude Code, Push nach Freigabe mit `git show --stat`, nur Dateien des Schritts stagen). Feste Werte statt Platzhalter: Listener `http`, Namespace `cert-manager`, Flux `infrastructure-networking`/`infrastructure-cert-manager`, Gateway-Manifest-Pfad, Tunnel-Catch-all.
