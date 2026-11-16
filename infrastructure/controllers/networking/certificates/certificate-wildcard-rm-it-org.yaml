@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-rm-it-org
+  namespace: default            # Namespace des Gateways — der Listener liest das Secret von hier
+spec:
+  secretName: wildcard-rm-it-org-tls
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-dns
+  dnsNames:
+    - "*.rm-it.org"
