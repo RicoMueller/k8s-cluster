@@ -1,0 +1,143 @@
+# Pantheon — Wartungs-Sensoren W1–W15 (rezept-monitoring-pantheon.md, Teil G).
+# Quelle: Wartungs-Sammler auf CT 113 (Textfile, Job "wartung"). Grundsatz wie ADR-003:
+# critical nur, wenn ein Wiederherstellungspfad oder die Management-Plane fehlt; alles andere ist
+# Arbeitsvorrat und nur im Dashboard sichtbar. Kein cluster-Label (ADR-013): Wartungsfenster-Silences
+# auf cluster=pantheon stummen diese Regeln bewusst nicht.
+groups:
+  - name: pantheon.wartung
+    rules:
+      # W1 — der Sammler selbst
+      - alert: PantheonWartungCollectorStale
+        expr: (time() - pantheon_wartung_lauf_timestamp_seconds > 13 * 3600) or absent(pantheon_wartung_lauf_timestamp_seconds)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Wartungs-Sammler (CT 113) seit über 13 h ohne Ergebnis"
+          description: "Zwei Läufe (Takt 6 h) fehlen. Prüfen: pct exec 113 -- systemctl status pantheon-wartung-state.timer pantheon-wartung-state.service"
+
+      # W2 — einzelner Teil liefert nicht (zwei Läufe in Folge)
+      - alert: PantheonWartungTeilFehlgeschlagen
+        expr: pantheon_wartung_teil_erfolg == 0
+        for: 13h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Wartungs-Sammler: Teil {{ $labels.teil }} liefert seit zwei Läufen nicht"
+          description: "Prüfen: pct exec 113 -- runuser -u pantheon-wartung -- /usr/local/bin/pantheon-wartung-state.sh --stdout (Meldungen auf stderr)."
+
+      # W3 — etcd-Backup der Control Plane (primärer Wiederherstellungspfad)
+      - alert: PantheonEtcdBackupStale
+        expr: (time() - pantheon_etcd_backup_last_timestamp_seconds > 26 * 3600) or (pantheon_etcd_backup_error == 1)
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "etcd-Backup der Control Plane älter als 26 h oder fehlerhaft"
+          description: "Omni sichert alle 24 h nach Hetzner (pantheon-omni-etcd). Vorfall 10.–12.10.2026: NIC-Hang am Proxmox-Host, zwei Backups fehlten unbemerkt. Prüfen: omnictl get etcdbackupstatuses.omni.sidero.dev pantheon -o yaml"
+
+      # W4 — Manifest-Sync blockiert (das 83-Tage-Signal)
+      - alert: PantheonOmniManifestSyncError
+        expr: pantheon_omni_manifest_sync_lasterror == 1
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Omni-Manifest-Sync blockiert (ckms.lasterror gefüllt)"
+          description: "Einziges verlässliches Sync-Signal laut rezept-omni-manifest-sync-pantheon.md. Ergänzt S12: meldet auch Blockaden ohne Image-Wechsel. Reparatur: Sync-Rezept, Teil F."
+
+      # W5/W6 — Management-Plane auf dem Proxmox-Host
+      - alert: PantheonOmniVmDown
+        expr: (pantheon_proxmox_guest_running{id="100"} == 0) or (pantheon_omni_container_running == 0)
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Omni (VM 100 oder Container) läuft nicht"
+          description: "Ohne Omni sind kubectl, omnictl, talosctl und alle Talos-/Kubernetes-Upgrades blind; der Cluster selbst läuft weiter. Prüfen: qm status 100; ssh rico@192.168.178.158 'cd /home/rico/omni && docker compose ps'"
+      - alert: PantheonManagementGastDown
+        expr: pantheon_proxmox_guest_running{id!="100"} == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gast {{ $labels.id }} ({{ $labels.name }}) auf dem Proxmox-Host läuft nicht"
+
+      # W7 — Update fällig (Zwei-Wochen-Regel erfüllt, seit einer Woche nicht umgesetzt)
+      - alert: PantheonVersionFaellig
+        expr: pantheon_version_faellig == 1
+        for: 7d
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.komponente }}: reifes Update liegt seit über 7 Tagen vor"
+          description: "Ziel und Abstand im Dashboard Pantheon – Wartung, Tabelle Versionen. Planung über den Versionsradar."
+
+      # W8/W9 — Omni-Release-Notes vor dem nächsten Upgrade
+      - alert: PantheonOmniUrgentNotes
+        expr: pantheon_omni_urgent_notes > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Omni {{ $labels.ziel }}: {{ $value }} Release(s) mit Urgent Upgrade Notes vor dem Upgrade lesen"
+          description: "omni-upgrade.sh hält an dieser Stelle ohnehin an; der Hinweis erlaubt die Vorbereitung vor dem Termin."
+      - alert: PantheonOmniMinTalosNichtErfuellt
+        expr: pantheon_omni_min_talos_erfuellt == 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Omni {{ $labels.ziel }} verlangt Talos >= {{ $labels.min_talos }} — erst Talos heben"
+
+      # W10 — omnictl passt nicht zum Backend (Stolperstein 15 Talos-Rezept)
+      - alert: PantheonOmnictlAbweichung
+        expr: pantheon_omnictl_abweichung == 1
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "omnictl ({{ $labels.ort }}) entspricht nicht der Omni-Version"
+          description: "Am Runner scheitert sonst der nächste Template-Sync, sobald sich die API-Version ändert. Angleichen: Talos-Rezept Anhang A.5 bzw. omni-upgrade.sh."
+
+      # W11 — unerwarteter Neustart des Omni-Containers (Befund 08.11.2026)
+      - alert: PantheonOmniNeustart
+        expr: changes(pantheon_omni_container_start_timestamp_seconds[1d]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Omni-Container wurde in den letzten 24 h neu gestartet"
+          description: "Nach einem geplanten Omni-Upgrade erwartet. Sonst Ursache klären: last -x auf der Omni-VM, journalctl -u docker."
+
+      # W12 — Snapshots nach der Beobachtungszeit aufräumen
+      - alert: PantheonSnapshotAlt
+        expr: time() - pantheon_snapshot_timestamp_seconds > 30 * 86400
+        labels:
+          severity: warning
+        annotations:
+          summary: "Snapshot {{ $labels.name }} (VM {{ $labels.vmid }}) ist älter als 30 Tage"
+          description: "Thin-LVM-Snapshots wachsen mit jeder Änderung. Nach der Beobachtungszeit löschen: qm delsnapshot {{ $labels.vmid }} {{ $labels.name }}"
+
+      # W13 — Wartungsrhythmus (monatlich) gerissen
+      - alert: PantheonWartungsfensterUeberfaellig
+        expr: time() - pantheon_wartungsfenster_timestamp_seconds{termin="letztes"} > 40 * 86400
+        labels:
+          severity: warning
+        annotations:
+          summary: "Letztes Wartungsfenster liegt über 40 Tage zurück"
+          description: "Monatlicher Rhythmus gegen Wartungsstau. termine.env auf CT 113 nach jedem Fenster aktualisieren."
+
+      # W14 — NIC-Hang am Proxmox-Host (Stolperstein 5 Talos-Rezept)
+      - alert: PantheonProxmoxNicHang
+        expr: pantheon_proxmox_nic_hangs_boot > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Proxmox-Host: {{ $value }} Meldungen 'Detected Hardware Unit Hang' seit dem Boot"
+          description: "Fix TSO/GSO aus prüfen: ethtool -k nic0 | grep -E 'tcp-segmentation-offload|generic-segmentation-offload'"
+
+      # W15 — Pull Request liegt zu lange
+      - alert: PantheonRenovatePrAlt
+        expr: time() - pantheon_renovate_oldest_pr_timestamp_seconds > 14 * 86400
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ältester offener Pull Request ist über 14 Tage alt"

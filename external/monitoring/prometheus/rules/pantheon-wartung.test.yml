@@ -1,0 +1,119 @@
+rule_files:
+  - pantheon-wartung.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # Fall W-1: Sammler läuft bis 6 h, dann nicht mehr — nach 13 h + 30 min Alarm.
+  - interval: 1m
+    input_series:
+      - series: 'pantheon_wartung_lauf_timestamp_seconds{job="wartung",instance="ct113:9100"}'
+        values: '0x360 21600x1440'
+    alert_rule_test:
+      - eval_time: 12h
+        alertname: PantheonWartungCollectorStale
+        exp_alerts: []
+      - eval_time: 21h
+        alertname: PantheonWartungCollectorStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: wartung
+              instance: ct113:9100
+            exp_annotations:
+              summary: "Wartungs-Sammler (CT 113) seit über 13 h ohne Ergebnis"
+              description: "Zwei Läufe (Takt 6 h) fehlen. Prüfen: pct exec 113 -- systemctl status pantheon-wartung-state.timer pantheon-wartung-state.service"
+
+  # Fall W-2: letztes etcd-Backup bei 0 — nach 26 h + 1 h critical; Fehler-Flag allein löst ebenfalls aus.
+  - interval: 1m
+    input_series:
+      - series: 'pantheon_etcd_backup_last_timestamp_seconds{job="wartung",instance="ct113:9100"}'
+        values: '0x1800'
+      - series: 'pantheon_etcd_backup_error{job="wartung",instance="ct113:9100"}'
+        values: '0x1800'
+    alert_rule_test:
+      - eval_time: 26h30m
+        alertname: PantheonEtcdBackupStale
+        exp_alerts: []
+      - eval_time: 27h30m
+        alertname: PantheonEtcdBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: wartung
+              instance: ct113:9100
+            exp_annotations:
+              summary: "etcd-Backup der Control Plane älter als 26 h oder fehlerhaft"
+              description: "Omni sichert alle 24 h nach Hetzner (pantheon-omni-etcd). Vorfall 10.–12.10.2026: NIC-Hang am Proxmox-Host, zwei Backups fehlten unbemerkt. Prüfen: omnictl get etcdbackupstatuses.omni.sidero.dev pantheon -o yaml"
+
+  # Fall W-3: Update fällig — erst nach 7 Tagen Warnung; Manifest-Sync-Fehler nach 1 h critical.
+  - interval: 1m
+    input_series:
+      - series: 'pantheon_version_faellig{job="wartung",instance="ct113:9100",komponente="talos"}'
+        values: '1x11000'
+      - series: 'pantheon_omni_manifest_sync_lasterror{job="wartung",instance="ct113:9100"}'
+        values: '0x120 1x300'
+    alert_rule_test:
+      - eval_time: 6d
+        alertname: PantheonVersionFaellig
+        exp_alerts: []
+      - eval_time: 7d1h
+        alertname: PantheonVersionFaellig
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: wartung
+              instance: ct113:9100
+              komponente: talos
+            exp_annotations:
+              summary: "talos: reifes Update liegt seit über 7 Tagen vor"
+              description: "Ziel und Abstand im Dashboard Pantheon – Wartung, Tabelle Versionen. Planung über den Versionsradar."
+      - eval_time: 2h30m
+        alertname: PantheonOmniManifestSyncError
+        exp_alerts: []
+      - eval_time: 3h30m
+        alertname: PantheonOmniManifestSyncError
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: wartung
+              instance: ct113:9100
+            exp_annotations:
+              summary: "Omni-Manifest-Sync blockiert (ckms.lasterror gefüllt)"
+              description: "Einziges verlässliches Sync-Signal laut rezept-omni-manifest-sync-pantheon.md. Ergänzt S12: meldet auch Blockaden ohne Image-Wechsel. Reparatur: Sync-Rezept, Teil F."
+
+  # Fall W-4: Omni-VM läuft, Container steht — 15 min später critical; Snapshot älter als 30 Tage.
+  - interval: 1m
+    input_series:
+      - series: 'pantheon_proxmox_guest_running{job="wartung",instance="ct113:9100",id="100",typ="vm",name="sidero-omni"}'
+        values: '1x40'
+      - series: 'pantheon_omni_container_running{job="wartung",instance="ct113:9100"}'
+        values: '1x10 0x40'
+      - series: 'pantheon_snapshot_timestamp_seconds{job="wartung",instance="ct113:9100",vmid="100",name="pre-omni-1-8-20261019"}'
+        values: '-2678400x40'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: PantheonOmniVmDown
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: PantheonOmniVmDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: wartung
+              instance: ct113:9100
+            exp_annotations:
+              summary: "Omni (VM 100 oder Container) läuft nicht"
+              description: "Ohne Omni sind kubectl, omnictl, talosctl und alle Talos-/Kubernetes-Upgrades blind; der Cluster selbst läuft weiter. Prüfen: qm status 100; ssh rico@192.168.178.158 'cd /home/rico/omni && docker compose ps'"
+      - eval_time: 30m
+        alertname: PantheonSnapshotAlt
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: wartung
+              instance: ct113:9100
+              vmid: "100"
+              name: pre-omni-1-8-20261019
+            exp_annotations:
+              summary: "Snapshot pre-omni-1-8-20261019 (VM 100) ist älter als 30 Tage"
+              description: "Thin-LVM-Snapshots wachsen mit jeder Änderung. Nach der Beobachtungszeit löschen: qm delsnapshot 100 pre-omni-1-8-20261019"

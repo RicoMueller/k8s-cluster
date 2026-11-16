@@ -25,3 +25,14 @@ scrape_configs:
       - source_labels: [__name__]
         regex: "pantheon_git_.*"
         action: keep
+
+  # Wartungs-Sammler (Teil G): node_exporter-Textfile auf CT 113, nur die pantheon_*-Serien behalten.
+  - job_name: wartung
+    scrape_interval: 5m
+    scrape_timeout: 30s
+    static_configs:
+      - targets: ["192.168.178.179:9100"]
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "pantheon_(wartung|version|etcd|omni|omnictl|snapshot|proxmox|renovate|wartungsfenster)_.*"
+        action: keep
