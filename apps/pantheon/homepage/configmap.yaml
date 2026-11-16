@@ -40,6 +40,12 @@ data:
       Test:
         style: row
         columns: 1
+      Monitoring:
+        style: row
+        columns: 3
+      Dashboards:
+        style: row
+        columns: 1
   custom.css: ""
   custom.js: ""
   docker.yaml: ""
@@ -129,6 +135,34 @@ data:
             icon: netgear.png
             href: http://192.168.178.45/
             description: Managed Switch
+    # Monitoring außerhalb des Clusters (LXC auf Proxmox, external/monitoring/).
+    # Links mit Namen (AdGuard-Rewrite, für den Browser), Widgets mit IP (Pod).
+    - Monitoring:
+        # /api/health ist ohne Anmeldung erreichbar.
+        - Grafana:
+            icon: grafana.png
+            href: http://grafana.pantheon.local:3000/d/pantheon-vorgaenge
+            description: Vorgänge
+            siteMonitor: http://192.168.178.178:3000/api/health
+        # Zählt nur Alarme, die wirklich benachrichtigen. Watchdog und Hinweise
+        # (Empfänger silent) bleiben außen vor, sonst stünde die Kachel nie auf 0.
+        - Alertmanager:
+            icon: alertmanager.png
+            href: http://alertmanager.pantheon.local:9093/
+            description: Alarme
+            widget:
+              type: customapi
+              url: http://192.168.178.97:9093/api/v2/alerts?active=true&silenced=false&inhibited=false&receiver=%5E(notfall%7Cpush-backup-info%7Cpush-backup-warn)%24
+              refreshInterval: 60000
+              mappings:
+                - label: Aktive Alarme
+                  format: size
+        # Nur Link: Basic-Auth auf allen Endpunkten, das prometheus-Widget kann
+        # sich nicht anmelden, ein siteMonitor stünde dauerhaft auf 401.
+        - Prometheus:
+            icon: prometheus.png
+            href: http://prometheus.pantheon.local:9090/
+            description: Metriken
   bookmarks.yaml: |
     - Entwicklung:
         - GitHub:
@@ -144,6 +178,13 @@ data:
         - Paperless-ngx:
             - abbr: PP
               href: http://paperless-test.pantheon.local/
+    - Dashboards:
+        - Pantheon – Vorgänge:
+            - abbr: PV
+              href: http://grafana.pantheon.local:3000/d/pantheon-vorgaenge
+        - Pantheon – Wartung:
+            - abbr: PW
+              href: http://grafana.pantheon.local:3000/d/pantheon-wartung
   widgets.yaml: |
     - kubernetes:
         cluster:
