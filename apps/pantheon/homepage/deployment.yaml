@@ -21,7 +21,7 @@ spec:
         # Die Konfiguration ist per subPath eingehängt und wird im laufenden Pod
         # nie aktualisiert. Bei jeder Änderung an configmap.yaml diesen Wert
         # anheben, dann startet der Rollout den Pod mit der neuen Konfiguration.
-        pantheon.rm-it.org/config-revision: "2026-11-16-monitoring"
+        pantheon.rm-it.org/config-revision: "2026-11-16-monitoring-order"
     spec:
       serviceAccountName: homepage
       automountServiceAccountToken: true
