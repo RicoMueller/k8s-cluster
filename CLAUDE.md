@@ -67,4 +67,6 @@ Sprache im Gespräch: **Deutsch**. Abkürzungen ausschreiben (z.B. „Pull Reque
 
 ## Laufendes Vorhaben
 
-**AFFiNE** (Whiteboard statt Apple Freeform): `docs/rezepte/rezept-affine-pantheon.md`. Der Stand steht in der Abendtabelle des Rezepts. Steps mit **[Rico]** nicht selbst ausführen, sondern Rico mit kopierfertigem Block oder genauem Klickpfad übergeben.
+**OpenCloud** (Dateiablage statt Dropbox, Dropbox wird danach gekündigt): `docs/rezepte/rezept-opencloud-pantheon.md`. Der Stand steht im Blockplan des Rezepts. Blöcke laufen bis zum nächsten ⏸ HALT durch; Schritte für Rico mit kopierfertigem Block oder genauem Klickpfad übergeben. `cloudflared` führt nur Rico aus.
+
+AFFiNE ist abgeschlossen (`docs/rezepte/rezept-affine-pantheon.md`); offen ist dort nur der erste Renovate-Pull-Request.
