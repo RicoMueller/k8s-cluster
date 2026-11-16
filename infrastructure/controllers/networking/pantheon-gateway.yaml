@@ -12,3 +12,15 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.rm-it.org"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: wildcard-rm-it-org-tls   # cert-manager, Certificate wildcard-rm-it-org (Rezept OpenCloud B.2)
+      allowedRoutes:
+        namespaces:
+          from: All
