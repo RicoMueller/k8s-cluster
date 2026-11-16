@@ -32,7 +32,7 @@
         "x": 0,
         "y": 0,
         "w": 24,
-        "h": 9
+        "h": 10
       },
       "datasource": {
         "type": "prometheus",
@@ -142,7 +142,7 @@
       "title": "etcd-Backup – Alter",
       "gridPos": {
         "x": 0,
-        "y": 9,
+        "y": 10,
         "w": 4,
         "h": 5
       },
@@ -203,7 +203,7 @@
       "title": "Manifest-Sync (ckms.lasterror)",
       "gridPos": {
         "x": 4,
-        "y": 9,
+        "y": 10,
         "w": 4,
         "h": 5
       },
@@ -272,7 +272,7 @@
       "title": "Letztes Wartungsfenster – vor",
       "gridPos": {
         "x": 8,
-        "y": 9,
+        "y": 10,
         "w": 4,
         "h": 5
       },
@@ -333,7 +333,7 @@
       "title": "Nächstes Wartungsfenster – in",
       "gridPos": {
         "x": 12,
-        "y": 9,
+        "y": 10,
         "w": 4,
         "h": 5
       },
@@ -395,7 +395,7 @@
       "title": "Offene Pull Requests",
       "gridPos": {
         "x": 16,
-        "y": 9,
+        "y": 10,
         "w": 4,
         "h": 5
       },
@@ -456,7 +456,7 @@
       "title": "Ältester Pull Request – Alter",
       "gridPos": {
         "x": 20,
-        "y": 9,
+        "y": 10,
         "w": 4,
         "h": 5
       },
@@ -517,7 +517,7 @@
       "title": "Snapshots VM 100",
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 15,
         "w": 4,
         "h": 5
       },
@@ -578,7 +578,7 @@
       "title": "Ältester Snapshot – Alter",
       "gridPos": {
         "x": 4,
-        "y": 14,
+        "y": 15,
         "w": 4,
         "h": 5
       },
@@ -639,7 +639,7 @@
       "title": "Proxmox – Pakete offen",
       "gridPos": {
         "x": 8,
-        "y": 14,
+        "y": 15,
         "w": 4,
         "h": 5
       },
@@ -700,7 +700,7 @@
       "title": "NIC-Hänger seit Boot",
       "gridPos": {
         "x": 12,
-        "y": 14,
+        "y": 15,
         "w": 4,
         "h": 5
       },
@@ -757,7 +757,7 @@
       "title": "Omni-Container läuft seit",
       "gridPos": {
         "x": 16,
-        "y": 14,
+        "y": 15,
         "w": 4,
         "h": 5
       },
@@ -815,7 +815,7 @@
       "title": "Wartungs-Sammler – letzter Lauf vor",
       "gridPos": {
         "x": 20,
-        "y": 14,
+        "y": 15,
         "w": 4,
         "h": 5
       },
@@ -876,9 +876,9 @@
       "title": "omnictl je Ort",
       "gridPos": {
         "x": 0,
-        "y": 19,
-        "w": 6,
-        "h": 6
+        "y": 20,
+        "w": 5,
+        "h": 7
       },
       "datasource": {
         "type": "prometheus",
@@ -887,13 +887,13 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "pantheon_omnictl_info",
+          "expr": "max by (ort, version) (pantheon_omnictl_info)",
           "instant": true,
           "format": "table"
         },
         {
           "refId": "B",
-          "expr": "pantheon_omnictl_abweichung",
+          "expr": "max by (ort) (pantheon_omnictl_abweichung)",
           "instant": true,
           "format": "table"
         }
@@ -936,10 +936,10 @@
       "type": "table",
       "title": "Snapshots",
       "gridPos": {
-        "x": 6,
-        "y": 19,
+        "x": 5,
+        "y": 20,
         "w": 7,
-        "h": 6
+        "h": 7
       },
       "datasource": {
         "type": "prometheus",
@@ -999,10 +999,10 @@
       "type": "table",
       "title": "Gäste auf dem Proxmox-Host",
       "gridPos": {
-        "x": 13,
-        "y": 19,
-        "w": 6,
-        "h": 6
+        "x": 12,
+        "y": 20,
+        "w": 7,
+        "h": 7
       },
       "datasource": {
         "type": "prometheus",
@@ -1084,9 +1084,9 @@
       "title": "Teile des Sammlers",
       "gridPos": {
         "x": 19,
-        "y": 19,
+        "y": 20,
         "w": 5,
-        "h": 6
+        "h": 7
       },
       "datasource": {
         "type": "prometheus",
@@ -1166,7 +1166,7 @@
       "title": "Vor dem nächsten Omni-Upgrade",
       "gridPos": {
         "x": 0,
-        "y": 25,
+        "y": 27,
         "w": 8,
         "h": 5
       },
@@ -1177,13 +1177,13 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "pantheon_omni_urgent_notes",
+          "expr": "max by (ziel) (pantheon_omni_urgent_notes)",
           "instant": true,
           "format": "table"
         },
         {
           "refId": "B",
-          "expr": "pantheon_omni_min_talos_erfuellt",
+          "expr": "max by (ziel, min_talos) (pantheon_omni_min_talos_erfuellt)",
           "instant": true,
           "format": "table"
         }
@@ -1227,7 +1227,7 @@
       "title": "Aktive Wartungs-Alerts",
       "gridPos": {
         "x": 8,
-        "y": 25,
+        "y": 27,
         "w": 16,
         "h": 5
       },
