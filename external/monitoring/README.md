@@ -8,6 +8,7 @@ Ausrollen von Hand per `pct push` (Interim bis Terraform/Proxmox-Projekt).
 | `prometheus/prometheus.yml` | CT 110 `/etc/prometheus/prometheus.yml` |
 | `prometheus/rules/*.rules.yml`, `*.test.yml` | CT 110 `/etc/prometheus/rules/` |
 | `alertmanager/alertmanager.yml` | CT 111 `/etc/alertmanager/alertmanager.yml` |
+| `alertmanager/pantheon.tmpl` | CT 111 `/etc/alertmanager/pantheon.tmpl` (Mailtext) |
 | `grafana/provisioning/datasources.yaml` | CT 112 `/etc/grafana/provisioning/datasources/pantheon.yaml` |
 | `grafana/provisioning/dashboards.yaml` | CT 112 `/etc/grafana/provisioning/dashboards/pantheon.yaml` |
 | `grafana/dashboards/*.json` | CT 112 `/var/lib/grafana/dashboards/` |

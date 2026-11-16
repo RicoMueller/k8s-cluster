@@ -1,0 +1,18 @@
+{{ define "pantheon.email.text" }}{{ if eq .Status "firing" }}🚨 NOTFALL in Pantheon — {{ len .Alerts.Firing }} Alarm(e) aktiv{{ else }}✅ ENTWARNUNG — der Notfall in Pantheon ist behoben{{ end }}
+{{ range .Alerts }}
+────────────────────────────────────────
+{{ if eq .Status "firing" }}AKTIV{{ else }}BEHOBEN{{ end }}: {{ .Annotations.summary }}
+{{ if .Annotations.description }}
+{{ .Annotations.description }}
+{{ end }}
+Beginn:  {{ .StartsAt.Local.Format "02.01.2006, 15:04 Uhr" }}{{ if eq .Status "resolved" }}
+Ende:    {{ .EndsAt.Local.Format "02.01.2006, 15:04 Uhr" }}{{ end }}
+Alarm:   {{ .Labels.alertname }}{{ if .Labels.namespace }} · Namespace {{ .Labels.namespace }}{{ end }}{{ if .Labels.pod }} · Pod {{ .Labels.pod }}{{ end }}{{ if .Labels.job_name }} · Job {{ .Labels.job_name }}{{ end }}{{ if .Labels.node }} · Node {{ .Labels.node }}{{ end }}
+{{ end }}
+────────────────────────────────────────
+Alertmanager: http://alertmanager.pantheon.local:9093
+Dashboard:    http://grafana.pantheon.local:3000/d/pantheon-vorgaenge
+Silence setzen, falls geplant (z. B. Wartungsfenster): siehe Rezept F.3.
+
+Diese Mail kommt vom Monitoring auf dem Proxmox-Host (CT 111), nicht aus dem Cluster.
+{{ end }}
