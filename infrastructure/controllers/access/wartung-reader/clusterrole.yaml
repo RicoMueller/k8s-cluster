@@ -1,0 +1,13 @@
+# Nur lesen, nur was der Wartungs-Sammler (CT 113) fuer Ist-Versionen braucht.
+# Bewusst ohne secrets, configmaps, pods/exec, pods/log (Unterschied zu xpipe-reader).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wartung-reader
+rules:
+  - apiGroups: [""]
+    resources: [namespaces, pods]
+    verbs: [get, list]
+  - apiGroups: [apps]
+    resources: [deployments, daemonsets]
+    verbs: [get, list]
