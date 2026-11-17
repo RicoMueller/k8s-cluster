@@ -1,0 +1,42 @@
+# Öffentlich (HTTP- und HTTPS-Listener): nur der OpenCloud-Realm und statische Ressourcen.
+# Bewusst nicht /realms/ — darunter läge auch der Admin-Realm master (Stolperstein 4).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak
+  namespace: opencloud
+spec:
+  parentRefs:
+    - name: pantheon-gateway
+      namespace: default
+  hostnames:
+    - keycloak.rm-it.org
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /realms/openCloud
+        - path:
+            type: PathPrefix
+            value: /resources
+      backendRefs:
+        - name: keycloak
+          port: 8080
+---
+# Administration: NUR am HTTPS-Listener. Der Tunnel liefert an den HTTP-Listener -> von außen nicht erreichbar.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak-admin
+  namespace: opencloud
+spec:
+  parentRefs:
+    - name: pantheon-gateway
+      namespace: default
+      sectionName: https
+  hostnames:
+    - keycloak-admin.rm-it.org
+  rules:
+    - backendRefs:
+        - name: keycloak
+          port: 8080
