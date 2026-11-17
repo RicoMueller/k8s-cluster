@@ -42,8 +42,12 @@ route:
       group_interval: 1h
       repeat_interval: 24h
 
+    # Notfall: Entwarnung spätestens 30 min nach Ende statt bis zu 6 h später
+    # (Erbe von group_interval 6h; Entscheidung Rico 17.11.2026 nach nächtlicher Sirene 05:40).
+    # Anhaltender Zustand meldet sich weiter höchstens einmal am Tag (repeat_interval 24h).
     - matchers: ['severity="critical"']
       receiver: notfall
+      group_interval: 30m
 
 receivers:
   - name: silent                      # bewusst ohne Integration
@@ -78,8 +82,10 @@ receivers:
       - user_key_file: /etc/alertmanager/pushover.user
         token_file: /etc/alertmanager/pushover.token
         send_resolved: true
-        priority: "1"                 # hoch: Ton, umgeht Ruhezeiten der App
-        sound: "siren"
+        # Notfall hoch mit Sirene (umgeht Ruhezeiten der App); Entwarnung normal,
+        # Standardton, hält Ruhezeiten ein – sie soll nachts niemanden wecken.
+        priority: '{{ if eq .Status "firing" }}1{{ else }}0{{ end }}'
+        sound: '{{ if eq .Status "firing" }}siren{{ else }}pushover{{ end }}'
         title: "🚨 Pantheon: {{ .CommonLabels.alertname }} ({{ .Status | toUpper }})"
         message: "{{ .CommonAnnotations.summary }}\n{{ .CommonAnnotations.description }}"
 
