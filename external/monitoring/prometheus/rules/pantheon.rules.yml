@@ -39,6 +39,7 @@ groups:
           summary: "Paperless-Export seit über 36 h nicht erfolgreich"
           description: "CronJob paperless-backup (02:30) hat zwei Nächte in Folge keinen Erfolg gemeldet. Prüfen: kubectl get jobs -n paperless --sort-by=.status.startTime | tail -5"
 
+      # Herkunft: das Szenario aus rezept-paperless E.7.
       - alert: PaperlessOffsiteSyncStale
         expr: time() - kube_cronjob_status_last_successful_time{cluster="pantheon", namespace="paperless", cronjob="paperless-offsite-sync"} > 36 * 3600
         for: 30m
@@ -46,7 +47,7 @@ groups:
           severity: critical
         annotations:
           summary: "Paperless Off-site-Sync (Storage Box) seit über 36 h nicht erfolgreich"
-          description: "Dokumente liegen derzeit nur auf der QNAP — das Szenario aus rezept-paperless E.7. Prüfen: kubectl logs -n paperless job/<letzter paperless-offsite-sync-Job>"
+          description: "Dokumente liegen derzeit nur auf der QNAP. Prüfen: kubectl logs -n paperless job/<letzter paperless-offsite-sync-Job>"
 
       - alert: PaperlessJobFailed
         expr: kube_job_status_failed{cluster="pantheon", namespace="paperless"} > 0

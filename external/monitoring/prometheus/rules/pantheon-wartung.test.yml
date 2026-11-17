@@ -44,7 +44,7 @@ tests:
               instance: ct113:9100
             exp_annotations:
               summary: "etcd-Backup der Control Plane älter als 26 h oder fehlerhaft"
-              description: "Omni sichert alle 24 h nach Hetzner (pantheon-omni-etcd). Vorfall 10.–12.10.2026: NIC-Hang am Proxmox-Host, zwei Backups fehlten unbemerkt. Prüfen: omnictl get etcdbackupstatuses.omni.sidero.dev pantheon -o yaml"
+              description: "Omni sichert alle 24 h nach Hetzner (pantheon-omni-etcd). Prüfen: omnictl get etcdbackupstatuses.omni.sidero.dev pantheon -o yaml"
 
   # Fall W-3: Update fällig — erst nach 7 Tagen Warnung; Manifest-Sync-Fehler nach 1 h critical.
   - interval: 1m
@@ -80,7 +80,7 @@ tests:
               instance: ct113:9100
             exp_annotations:
               summary: "Omni-Manifest-Sync blockiert (ckms.lasterror gefüllt)"
-              description: "Einziges verlässliches Sync-Signal laut rezept-omni-manifest-sync-pantheon.md. Ergänzt S12: meldet auch Blockaden ohne Image-Wechsel. Reparatur: Sync-Rezept, Teil F."
+              description: "Geänderte Manifeste erreichen den Cluster nicht. Prüfen: omnictl get ckms pantheon -o yaml | grep lasterror. Reparatur: Sync-Rezept, Teil F."
 
   # Fall W-4: Omni-VM läuft, Container steht — 15 min später critical; Snapshot älter als 30 Tage.
   - interval: 1m
