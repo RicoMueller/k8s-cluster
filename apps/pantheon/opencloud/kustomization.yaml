@@ -10,4 +10,4 @@ configMapGenerator:
   - name: keycloak-realm
     namespace: opencloud
     files:
-      - keycloak/opencloud-realm.json
+      - openCloud-realm.json=keycloak/opencloud-realm.json   # Keycloak 26.8: Dateiname = Realm-Name
