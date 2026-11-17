@@ -40,3 +40,28 @@ spec:
     - backendRefs:
         - name: keycloak
           port: 8080
+---
+# Admin-Realm master auf dem Haupt-Hostnamen: NUR am HTTPS-Listener (LAN).
+# Die Admin-Konsole (keycloak-admin.rm-it.org) meldet über authServerUrl = KC_HOSTNAME an
+# und prüft dort /realms/master/.../3p-cookies. Über den Tunnel (HTTP-Listener) bleibt
+# /realms/master gesperrt (Stolperstein 4, 31).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak-master-lan
+  namespace: opencloud
+spec:
+  parentRefs:
+    - name: pantheon-gateway
+      namespace: default
+      sectionName: https
+  hostnames:
+    - keycloak.rm-it.org
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /realms/master
+      backendRefs:
+        - name: keycloak
+          port: 8080
