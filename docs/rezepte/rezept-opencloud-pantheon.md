@@ -108,7 +108,7 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 | 0 ✅ 16.11.2026 (0.6 offen) | Rezept ins Repo, Vorab-Checks, Upstream-Abgleich, Versionen; **0.6 Speicher freiräumen** | 5 Min (Eingaben) + 0.6: ~1 h aktiv, spätestens vor Block F | ~25 Min | 0 | keine (0.6: nur QNAP) |
 | A ✅ 16.11.2026 | Cloudflare-Token, alle Grund-Secrets inkl. SMTP | ~15 Min | Prüfung `ENC[` | — | keine |
 | B ✅ 16.11.2026 | Wildcard-Zertifikat, HTTPS-Listener am Gateway | — | ~30 Min | 0 | HTTPS im LAN für `*.rm-it.org` |
-| C | Keycloak-DB, Keycloak mit SMTP, Routen | ~15 Min | ~40 Min | 1 | Identität läuft (LAN), Keycloak sendet Mails |
+| C ✅ 17.11.2026 | Keycloak-DB, Keycloak mit SMTP, Routen | ~15 Min | ~40 Min | 1 | Identität läuft (LAN), Keycloak sendet Mails |
 | D | OpenCloud mit Mail-Benachrichtigungen, WOPI, Collabora, Routen, Renovate | ~10 Min | ~40 Min | 1 | OpenCloud im LAN nutzbar |
 | E | Sicherheits-Gate, DNS-Routen, externe Prüfungen, Geräte | ~20 Min | ~20 Min | 2 | von außen + Apps |
 | F | Dropbox-Zugang, Testkopie, Vollkopie starten | ~20 Min | ~30 Min + Laufzeit (Tage) | 1 | Kopie läuft im Hintergrund |
@@ -1017,6 +1017,8 @@ Aus der Upstream-Realm-Datei **`config/keycloak/opencloud-realm-autoprovisioning
    ```
 6. `"internationalizationEnabled": true`, `"supportedLocales": ["de", "en"]`, `"defaultLocale": "de"` — Login-Seite und Mails für Bandkollegen auf Deutsch.
 7. Clients, Rollen und Mapper sonst unverändert. Keine LDAP-Federation (die Autoprovisioning-Datei enthält keine).
+8. **`components["org.keycloak.keys.KeyProvider"]` löschen** — die Upstream-Datei enthält echte Schlüssel (RSA-`privateKey`, HMAC- und AES-`secret`), öffentlich auf GitHub. Ohne den Abschnitt erzeugt Keycloak beim Import eigene (Stolperstein 29).
+9. `"loginTheme": ""` — das Upstream-Theme `opencloud` wird nicht eingebunden; Keycloak nutzt seine Standard-Anmeldeseite.
 
 ```bash
 R=apps/pantheon/opencloud/keycloak/opencloud-realm.json
@@ -1028,8 +1030,15 @@ jq -e '.registrationAllowed == false and .bruteForceProtected == true and .reset
        and .smtpServer.password == "${SMTP_PASSWORD}"' "$R" && echo REALM_OK
 grep -c 'opencloud.test' "$R"
 grep -cE '"password"\s*:\s*"[^$]' "$R"
-# Erwartung: REALM_OK; 0; 0  (kein Passwort im Klartext, nur ${…}-Platzhalter)
+jq -c '[(.components["org.keycloak.keys.KeyProvider"] // [] | length),
+        ([paths as $p | select(($p[-1]|tostring)|test("^(privateKey|certificate)$"))] | length),
+        ([.. | objects | .secret? // empty | select(test("^\\*+$")|not)] | length)]' "$R"
+# Erwartung: REALM_OK; 0; 0; [0,0,0]  (kein Passwort im Klartext, nur ${…}-Platzhalter; kein Schlüsselmaterial)
 ```
+
+> **⚠️ Stolperstein 29 — Schlüssel in der Upstream-Realm-Datei.** `opencloud-realm-autoprovisioning.dist.json` (Upstream `d4695d2`) enthält das Schlüsselmaterial des Exports: RSA-Signaturschlüssel, HMAC- und AES-Secrets. Importiert, signierte Keycloak Tokens mit einem öffentlich bekannten Schlüssel — jeder könnte sich ein Token mit `opencloudAdmin` ausstellen, OpenCloud prüft per Signatur (`jwt`). Deshalb Punkt 8 und die `[0,0,0]`-Prüfung. Gegenprobe nach dem Import: das `x5c`-Zertifikat aus `/realms/openCloud/protocol/openid-connect/certs` ist **nicht** das aus der Upstream-Datei (C.4).
+
+> **⚠️ Stolperstein 30 — Dateiname = Realm-Name.** Keycloak 26.8 bricht `--import-realm` ab, wenn der Dateiname nicht zum Realm passt (`File name / realm name mismatch … should be openCloud-realm.json`), Groß-/Kleinschreibung zählt. Im `configMapGenerator` deshalb `openCloud-realm.json=keycloak/opencloud-realm.json`.
 
 > **⚠️ Stolperstein 3 — Der Realm-Import läuft nur einmal.** `--import-realm` überspringt einen bereits existierenden Realm. Die Datei in Git ist der **Anfangszustand**; spätere Änderungen (Konten, OTP, Rollen, **SMTP**) leben in der Datenbank. Wer den Realm neu importieren will, muss ihn vorher löschen. Ein geändertes IONOS-Passwort trägt Rico deshalb zusätzlich in der Admin-Konsole ein (Stolperstein 24).
 
@@ -1199,6 +1208,34 @@ spec:
           port: 8080
 ```
 
+Dritte Route — der `master`-Realm auf dem Haupt-Hostnamen, **nur am HTTPS-Listener** (Stolperstein 31):
+
+```yaml
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak-master-lan
+  namespace: opencloud
+spec:
+  parentRefs:
+    - name: pantheon-gateway
+      namespace: default
+      sectionName: https
+  hostnames:
+    - keycloak.rm-it.org
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /realms/master
+      backendRefs:
+        - name: keycloak
+          port: 8080
+```
+
+> **⚠️ Stolperstein 31 — Admin-Konsole meldet über den Haupt-Hostnamen an.** Mit `KC_HOSTNAME_ADMIN` läuft die Konsole unter `keycloak-admin.rm-it.org`, ihr `authServerUrl` ist aber `KC_HOSTNAME` (`https://keycloak.rm-it.org`). Die Konsole prüft dort `/realms/master/protocol/openid-connect/3p-cookies/…` — ohne die Route oben 404 und die Meldung „Timeout when waiting for 3rd party check iframe message". Die Route hängt nur am Listener `https`: im LAN erreichbar, über den Tunnel (HTTP-Listener) bleibt `/realms/master` 404 (C.4/2).
+
 > **⚠️ Stolperstein 4 — `/realms/` wäre zu breit.** Die Keycloak-Doku empfiehlt `/realms/` öffentlich freizugeben. Darunter liegt aber auch `/realms/master` — der Admin-Realm mit Token-Endpunkt. Hier wird bewusst nur `/realms/openCloud` freigegeben.
 
 ### C.3.5 — Kustomization und Flux-Schalter
@@ -1218,7 +1255,7 @@ configMapGenerator:
   - name: keycloak-realm
     namespace: opencloud
     files:
-      - keycloak/opencloud-realm.json
+      - openCloud-realm.json=keycloak/opencloud-realm.json   # Keycloak 26.8: Dateiname = Realm-Name (Stolperstein 30)
 ```
 
 `clusters/pantheon/apps-opencloud.yaml` (Vorlage `apps-affine.yaml`):
@@ -1275,6 +1312,11 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "Host: keycloak.rm-it.org" http://$G
 curl -s -o /dev/null -w "%{http_code}\n" -H "Host: keycloak-admin.rm-it.org" http://$GW/
 # Erwartung: 404 und 404
 
+# 2b. master-Realm im LAN (HTTPS-Listener) erreichbar — für die Admin-Konsole (Stolperstein 31)
+curl -s -o /dev/null -w "%{http_code}\n" --resolve keycloak.rm-it.org:443:$GW \
+  https://keycloak.rm-it.org/realms/master/protocol/openid-connect/3p-cookies/step1.html
+# Erwartung: 200
+
 # 3. Admin-Host über HTTPS (nur LAN)
 curl -s -o /dev/null -w "%{http_code}\n" --resolve keycloak-admin.rm-it.org:443:$GW https://keycloak-admin.rm-it.org/admin/
 # Erwartung: 200 oder 302
@@ -1282,6 +1324,11 @@ curl -s -o /dev/null -w "%{http_code}\n" --resolve keycloak-admin.rm-it.org:443:
 # 4. Keine Konten und Gruppen im importierten Anfangszustand (Demo-Einträge entfernt)
 jq -c '[((.users // []) | length), ((.groups // []) | length)]' apps/pantheon/opencloud/keycloak/opencloud-realm.json
 # Erwartung: [0,0]
+
+# 5. Eigener Signaturschlüssel, nicht der aus Upstream (Stolperstein 29)
+curl -s --resolve keycloak.rm-it.org:443:$GW https://keycloak.rm-it.org/realms/openCloud/protocol/openid-connect/certs \
+  | jq -r '.keys[] | select(.use=="sig") | .x5c[0]' | head -c 40; echo
+# Erwartung: anders als der Anfang von rsa-generated.certificate in der Upstream-Datei
 ```
 
 ## C.5 — ⏸ HALT: DNS im LAN und Keycloak-Konten *(Rico, ~15 Min)*
@@ -1294,8 +1341,8 @@ jq -c '[((.users // []) | length), ((.groups // []) | length)]' apps/pantheon/op
 > **2. FRITZ!Box** (Heimnetz → Netzwerk → Netzwerkeinstellungen → DNS-Rebind-Schutz): dieselben vier Namen als Ausnahmen eintragen — wie bei den Omni-Hostnamen, jeder Name einzeln.
 >
 > **3. Keycloak-Administration** — `https://keycloak-admin.rm-it.org/admin/` öffnen, mit `kcadmin` und dem Passwort aus Block A anmelden:
-> 1. Realm **master** → Users → **eigenes dauerhaftes Admin-Konto** anlegen, Passwort setzen, Rolle `admin` zuweisen. Abmelden, mit dem neuen Konto anmelden, **`kcadmin` löschen**.
-> 2. Realm **openCloud** → *Realm settings → Email*: Werte prüfen (Host `smtp.ionos.de`, Port `587`, From `noreply@rm-it.org`, Anzeigename `Pantheon Cloud`, StartTLS an, Authentifizierung an) → **Test connection**. Keycloak schickt die Testmail an die E-Mail-Adresse des gerade angemeldeten Admin-Kontos — die muss also gesetzt sein (Schritt 1).
+> 1. Realm **master** → Users → **eigenes dauerhaftes Admin-Konto** `rico-admin` anlegen (E-Mail gesetzt, *Email verified* an), Passwort setzen („Keycloak-Administrator rico-admin (Realm master)"), Rolle `admin` zuweisen. Abmelden, mit dem neuen Konto anmelden, **`kcadmin` löschen**.
+> 2. Realm **openCloud** → *Realm settings → Email*: Werte prüfen (Host `smtp.ionos.de`, Port `587`, From `noreply@rm-it.org`, Anzeigename `Pantheon Cloud`, StartTLS an, Authentifizierung an) → **Test connection**. Keycloak schickt die Testmail an die E-Mail-Adresse des gerade angemeldeten Admin-Kontos — die muss also gesetzt sein (Schritt 1). *Bleibt der Knopf grau („…e-mail address for the current user ()"), kennt die Konsolensitzung die Adresse nicht; neu anmelden oder überspringen — Schritt 5 ist der echte Ende-zu-Ende-Test (17.11.2026 so verlaufen).*
 > 3. Realm **openCloud** → *Users* → **Add user**: Username `rico`, E-Mail (private Adresse), Vor-/Nachname → Create.
 > 4. *Role mapping* → **Assign role** → Realm-Rolle **`opencloudAdmin`**.
 > 5. *Credentials* → **Credential reset** → Aktionen **Update Password** und **Configure OTP** → *Send email*. Die Mail von `Pantheon Cloud <noreply@rm-it.org>` öffnen, Link folgen, Passwort setzen, Authenticator-App koppeln. — Das ist zugleich der Ende-zu-Ende-Test für Einladungen an Gäste (I.4).
@@ -1329,13 +1376,13 @@ dig +short cloud.rm-it.org @192.168.178.53
 
 | Prüfpunkt | Erwartung | Ist |
 |---|---|---|
-| `database keycloak` applied | true | |
-| Issuer über HTTPS | `https://keycloak.rm-it.org/realms/openCloud` | |
-| `/realms/master` und Admin-Host über HTTP-Listener | 404 / 404 | |
-| Realm-Datei: Konten / Gruppen | `[0,0]` | |
-| Keycloak *Test connection* | Testmail angekommen | |
-| Einladungsmail an `rico` (Update Password, OTP) | angekommen, nicht im Spam | |
-| AdGuard-Auflösung | `192.168.178.224` | |
+| `database keycloak` applied | true | true (Rolle ebenfalls true) |
+| Issuer über HTTPS | `https://keycloak.rm-it.org/realms/openCloud` | ✅ gleich; „Realm 'openCloud' imported" (nach Fix Stolperstein 30) |
+| `/realms/master` und Admin-Host über HTTP-Listener | 404 / 404 | ✅ 404 / 404; Admin über HTTPS 302 |
+| Realm-Datei: Konten / Gruppen | `[0,0]` | ✅ `[0,0]`; Schlüsselmaterial `[0,0,0]`; Live-Signaturzertifikat ≠ Upstream |
+| Keycloak *Test connection* | Testmail angekommen | übersprungen (Knopf grau, Stolperstein in C.5 Schritt 2); Versand über Einladung an `rico` belegt |
+| Einladungsmail an `rico` (Update Password, OTP) | angekommen, nicht im Spam | ✅ angekommen, Passwort und OTP eingerichtet; Keycloak-Log ohne SMTP-Fehler |
+| AdGuard-Auflösung | `192.168.178.224` | ✅ cloud, keycloak, keycloak-admin, collabora → `192.168.178.224`; FRITZ!Box-Ausnahmen eingetragen; `kcadmin` gelöscht, `rico-admin` aktiv |
 
 ---
 
@@ -2897,7 +2944,9 @@ Reihenfolge = empfohlene Priorität, jeweils mit dem Risiko bis dahin.
 **1.2 (16.11.2026)** — Ergebnisse aus Teil 0, Entscheidungen Rico vom selben Tag.
 - **Identität (Architekturentscheidung 3 neu):** Autoprovisioning ins eingebaute OpenCloud-Verzeichnis `idm` statt Keycloak + OpenLDAP. Grund: einziges Upstream-LDAP-Image `bitnamilegacy/openldap:2.6` seit 19.08.2025 ohne Updates. C.3.1 (OpenLDAP), LDAP-Passwort in A.2, LDAP-Prüfungen in C.4/C.6/E.1, LDAP-Export in H und `ldap-data` entfallen. Realm-Datei aus `opencloud-realm-autoprovisioning.dist.json` (Konten und Gruppen geleert, `opencloudGuest` als Default-Rolle). D.4 mit `PROXY_AUTOPROVISION_ACCOUNTS=true`, `sub` als Benutzerkennung, Rollen aus Claim `roles`, `OC_EXCLUDE_RUN_SERVICES=idp`. Neue Stolpersteine 27 (Konto erst nach erster Anmeldung) und 28 (Konten in zwei Systemen); Stolperstein 1 auf die Realm-Datei umgeschrieben; D.9 prüft die Benutzerliste (kein `admin`).
 - **WOPI (Architekturentscheidung 5):** `collaboration` als Dienst im OpenCloud-Prozess unter `https://cloud.rm-it.org/wopi` (wie Upstream). Hostname `wopi.rm-it.org`, WOPI-Container, Service und Route entfallen; Collabora `aliasgroup1` auf `cloud.rm-it.org`.
+- **0.6 Verlauf (17.11.2026):** Transfer lag in einem eigenen SSD-Pool (kein Gewinn für Pool 1); nach Abyss Of Hel (100 GB) und TimeMachine (1,5 TB) 4,4 TB frei → Eingang Block F erfüllt. UrdaSot-Archiv mit **rclone crypt vom Mac** statt HBS 3 (HBS-3-WebDAV verbindet nicht mit Hetzner, Zugangsdaten per `curl` bestätigt); Upload über 2,4-GHz-WLAN langsam und anfangs mit SMB-Timeouts → `--transfers 2 --checkers 4 --bwlimit 3.5M`.
 - **Neu 0.6 (Rico):** Speicher im QNAP-Pool freiräumen (Transfer löschen, Abyss Of Hel und TimeMachine verkleinern, UrdaSot verschlüsselt auf die Storage Box archivieren und löschen). Teil 0 hatte 2,5 TB frei gegen 3,6 TB Bedarf gemessen. Block F prüft das als Eingang; das Archiv belegt voraussichtlich den Storage-Box-Sub-Account `u620152-sub2`, Block H nutzt deshalb `u620152-sub3`; Block J deaktiviert den HBS-3-Spiegel PrivateCloud und entfernt das Volume mit dem Konto-Löschen.
+- **Block C (17.11.2026):** Stolperstein 29 (Upstream-Realm enthält echte Schlüssel → `KeyProvider` löschen, Prüfung `[0,0,0]`, Gegenprobe C.4/5), Stolperstein 30 (Dateiname = Realm-Name, `configMapGenerator` mit Schlüssel `openCloud-realm.json`), Stolperstein 31 (Route `keycloak-master-lan` nur am HTTPS-Listener für die Admin-Konsole), `loginTheme` geleert; C.5 mit Konto `rico-admin` und Hinweis zu grauem *Test connection*.
 - **Korrekturen:** OpenCloud-Tag 7.2.3 → 7.2.5; Laufzeitformel in 0.5 mit × 8000 statt × 8 (GB → Mbit).
 - **A.2 in vier Schritte geteilt** (Eingaben einzeln, wie am 16.11.2026 ausgeführt): eine Passwortabfrage im selben Einfügeblock wie weitere Zeilen frisst sonst die Folgezeilen als Eingabe. Bootstrap-Admin-Passwort mit sprechendem Namen.
 
