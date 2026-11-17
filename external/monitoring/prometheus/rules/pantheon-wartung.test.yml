@@ -24,18 +24,18 @@ tests:
               summary: "Wartungs-Sammler (CT 113) seit über 13 h ohne Ergebnis"
               description: "Zwei Läufe (Takt 6 h) fehlen. Prüfen: pct exec 113 -- systemctl status pantheon-wartung-state.timer pantheon-wartung-state.service"
 
-  # Fall W-2: letztes etcd-Backup bei 0 — nach 26 h + 1 h critical; Fehler-Flag allein löst ebenfalls aus.
+  # Fall W-2: letztes etcd-Backup bei 0 — nach 32 h + 1 h critical; Fehler-Flag allein löst ebenfalls aus.
   - interval: 1m
     input_series:
       - series: 'pantheon_etcd_backup_last_timestamp_seconds{job="wartung",instance="ct113:9100"}'
-        values: '0x1800'
+        values: '0x2100'
       - series: 'pantheon_etcd_backup_error{job="wartung",instance="ct113:9100"}'
-        values: '0x1800'
+        values: '0x2100'
     alert_rule_test:
-      - eval_time: 26h30m
+      - eval_time: 32h30m
         alertname: PantheonEtcdBackupStale
         exp_alerts: []
-      - eval_time: 27h30m
+      - eval_time: 33h30m
         alertname: PantheonEtcdBackupStale
         exp_alerts:
           - exp_labels:
@@ -43,7 +43,7 @@ tests:
               job: wartung
               instance: ct113:9100
             exp_annotations:
-              summary: "etcd-Backup der Control Plane älter als 26 h oder fehlerhaft"
+              summary: "etcd-Backup der Control Plane älter als 32 h oder fehlerhaft"
               description: "Omni sichert alle 24 h nach Hetzner (pantheon-omni-etcd). Prüfen: omnictl get etcdbackupstatuses.omni.sidero.dev pantheon -o yaml"
 
   # Fall W-3: Update fällig — erst nach 7 Tagen Warnung; Manifest-Sync-Fehler nach 1 h critical.

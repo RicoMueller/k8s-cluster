@@ -28,13 +28,16 @@ groups:
 
       # W3 — etcd-Backup der Control Plane (primärer Wiederherstellungspfad)
       # Herkunft: Vorfall 10.–12.10.2026, NIC-Hang am Proxmox-Host, zwei Backups fehlten unbemerkt.
+      # Schwelle 32 h = 24 h Backup-Takt + 6 h Sammeltakt (CT 113) + 2 h Puffer. Mit 26 h feuerte
+      # die Regel jede Nacht falsch, weil der Sammler das neue Backup erst bis zu 6 h später sieht
+      # (Fehlalarm 16.11.2026 23:40).
       - alert: PantheonEtcdBackupStale
-        expr: (time() - pantheon_etcd_backup_last_timestamp_seconds > 26 * 3600) or (pantheon_etcd_backup_error == 1)
+        expr: (time() - pantheon_etcd_backup_last_timestamp_seconds > 32 * 3600) or (pantheon_etcd_backup_error == 1)
         for: 1h
         labels:
           severity: critical
         annotations:
-          summary: "etcd-Backup der Control Plane älter als 26 h oder fehlerhaft"
+          summary: "etcd-Backup der Control Plane älter als 32 h oder fehlerhaft"
           description: "Omni sichert alle 24 h nach Hetzner (pantheon-omni-etcd). Prüfen: omnictl get etcdbackupstatuses.omni.sidero.dev pantheon -o yaml"
 
       # W4 — Manifest-Sync blockiert (das 83-Tage-Signal)
