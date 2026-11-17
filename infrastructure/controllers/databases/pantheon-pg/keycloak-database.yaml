@@ -1,0 +1,10 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: keycloak
+  namespace: databases
+spec:
+  cluster:
+    name: pantheon-pg
+  name: keycloak
+  owner: keycloak

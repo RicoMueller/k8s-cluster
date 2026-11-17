@@ -18,3 +18,6 @@ resources:
   - affine-db-role-secret.yaml
   - affine-role.yaml
   - affine-database.yaml
+  - keycloak-db-role-secret.yaml
+  - keycloak-role.yaml
+  - keycloak-database.yaml

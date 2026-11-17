@@ -1,0 +1,13 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: keycloak
+  namespace: databases
+spec:
+  cluster:
+    name: pantheon-pg
+  name: keycloak
+  ensure: present
+  login: true
+  passwordSecret:
+    name: keycloak-db-role
