@@ -34,7 +34,7 @@ spec:
         - name: init
           # Gleicher Tag wie der Container unten — Renovate hebt beide in einem Pull Request.
           # renovate: datasource=docker depName=docker.io/opencloudeu/opencloud
-          image: docker.io/opencloudeu/opencloud:7.2.5
+          image: docker.io/opencloudeu/opencloud:9.1.1
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh", "-c"]
           args:
@@ -54,7 +54,7 @@ spec:
       containers:
         - name: opencloud
           # renovate: datasource=docker depName=docker.io/opencloudeu/opencloud
-          image: docker.io/opencloudeu/opencloud:7.2.5
+          image: docker.io/opencloudeu/opencloud:9.1.1
           imagePullPolicy: IfNotPresent
           command: ["opencloud"]
           args: ["server"]
