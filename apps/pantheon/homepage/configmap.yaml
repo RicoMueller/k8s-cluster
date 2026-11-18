@@ -78,6 +78,23 @@ data:
                   label: Version
                 - field: type
                   label: Typ
+        # Homepage v2.8.0 hat kein OpenCloud-Widget -> customapi auf /status.php
+        # (öffentlich, ownCloud-kompatibel). Clusterintern aus demselben Grund wie AFFiNE.
+        # Kein OpenCloud-Icon in den Dashboard-Icons -> Material Design Icon.
+        - OpenCloud:
+            icon: mdi-cloud
+            href: https://cloud.rm-it.org/
+            description: Dateiablage
+            siteMonitor: http://opencloud.opencloud.svc.cluster.local:9200/status.php
+            widget:
+              type: customapi
+              url: http://opencloud.opencloud.svc.cluster.local:9200/status.php
+              refreshInterval: 60000
+              mappings:
+                - field: productversion
+                  label: Version
+                - field: edition
+                  label: Edition
     - Infrastruktur:
         - QNAP NAS:
             icon: qnap.png
@@ -96,6 +113,14 @@ data:
             icon: talos.png
             href: https://omni.rm-it.org/
             description: Cluster-Management
+        # Kein Keycloak-Widget in Homepage v2.8.0; Version/Statistik nur mit Admin-Token.
+        # Daher nur siteMonitor auf den öffentlichen Realm-Endpunkt (Port 9000/health
+        # liegt nicht im Service). Link auf die Admin-Konsole (nur LAN, HTTPS-Listener).
+        - Keycloak:
+            icon: keycloak.png
+            href: https://keycloak-admin.rm-it.org/
+            description: Identitäten (OpenCloud)
+            siteMonitor: http://keycloak.opencloud.svc.cluster.local:8080/realms/openCloud
     - Netzwerk:
         - FRITZ!Box:
             icon: fritzbox.png
