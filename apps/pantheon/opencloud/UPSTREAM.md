@@ -15,7 +15,7 @@ Ermittelt am 16.11.2026 durch Claude Code. Grundlage für alle `__PLATZHALTER__`
 
 | Komponente | Image | Tag | Herkunft |
 |---|---|---|---|
-| OpenCloud | `docker.io/opencloudeu/opencloud` | `7.2.5` | höchste `v7.2.*` (7.2.3 → 7.2.5); Manifest-Abfrage HTTP 200. `8.x`/`9.x` existieren nur in `opencloud-rolling` (404 im Production-Repository) |
+| OpenCloud | `docker.io/opencloudeu/opencloud` | **`9.1.1`** (seit 18.11.2026) | Teil 0: höchste `v7.2.*` = 7.2.5. Am 18.11.2026: Update-Kanal `channels.stable.current_version` = 9.1.1, 7.2.0–7.2.5 als kritisch markiert, `opencloudeu/opencloud:9.1.1` vorhanden (200), daneben 7.2.6 (17.11.2026). Entscheidung Rico: 9.1.1, Neuinstallation (Instanz leer). Gegen 9.1.1-Quelltext (`437c311a`) geprüft: alle Umgebungsvariablen vorhanden; idm-Default, Admin-Bedingung, Rollen-Mapping, `/wopi`, Proof-Key-Cache, init-Flags unverändert |
 | Keycloak | `quay.io/keycloak/keycloak` | `26.8.2` | Upstream `26.8.2` = neuester Patch der Linie und neueste Version überhaupt |
 | Collabora | `docker.io/collabora/code` | `26.04.6.1.1` | Upstream = neuester Patch von `26.04` |
 | Tika | `docker.io/apache/tika` | `4.2.0` | Upstream nutzt `latest` (wandernd). `latest` = `4.2.0` = `4.2.0-1` (gleicher Digest). `4.2.0` gewählt, weil die Renovate-Regel nur `X.Y.Z` zulässt; `-SNAPSHOT` ausgeschlossen |
@@ -124,6 +124,8 @@ Nicht als Upstream-Compose erprobt (Upstream `idm/external-idp.yml` nutzt ein ex
 | 5 | **PrivateCloud (HBS-3-Spiegel) 1,34 TB < Dropbox 1690 GB** — Spiegel vermutlich unvollständig. | Kein Ersatz für Migration und Hash-Prüfung; Volume wird in Block J entfernt |
 
 ## Block D — Entscheidungen (Rico, 18.11.2026)
+
+**`SPACE_PATH`** (persönlicher Space `rico`, für Block F/G): `/var/lib/opencloud/storage/users/users/2c5b753a-5737-47a7-98b3-be001286b788` — Verzeichnisname ist die Space-ID (Autoprovisioning mit `sub`).
 
 **Collabora-Capabilities** — wie Default des offiziellen Helm-Charts `CollaboraOnline/online` `kubernetes/helm/collabora-online` (`securityContext: {}`): Standard-Capabilities des Containers (u. a. `MKNOD`, `SYS_CHROOT`, `CHOWN`, `FOWNER`), **kein** `SYS_ADMIN`, `allowPrivilegeEscalation` nicht auf `false` (Datei-Capabilities von `coolforkit`), Seccomp `RuntimeDefault`. PodSecurity `baseline` bleibt erfüllt. Upstream-Compose (`SYS_ADMIN`, `seccomp=unconfined`, `apparmor:unconfined`) wäre nur mit `privileged` möglich. Folge: Collabora kopiert die Jail-Vorlage statt sie einzuhängen (langsamerer erster Dokumentstart) — Prüfung D.8/D.9.
 

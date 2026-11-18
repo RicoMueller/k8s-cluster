@@ -4,7 +4,7 @@
 >
 > Das Rezept ist in **Blöcke** geschnitten, die Claude Code jeweils in einem Stück abarbeitet. Unterbrechungen gibt es nur an den markierten **⏸ HALT**-Punkten — dort, wo Rico eingreifen muss (Secrets, Weboberflächen, `cloudflared`, Geräte, unumkehrbare Entscheidungen). Ablageort im Repo: `docs/rezepte/rezept-opencloud-pantheon.md`.
 
-*Rezeptversion: 1.2 — November 2026 · Cluster: Pantheon · Zielversion: OpenCloud 7.2.x (Production-Linie)*
+*Rezeptversion: 1.2 — November 2026 · Cluster: Pantheon · Zielversion: OpenCloud 9.1.x (Production-Linie; bis 18.11.2026 7.2.x)*
 
 > **Status:** Nicht live verifiziert. Version 1.2 enthält die Ergebnisse und Entscheidungen aus Teil 0 (16.11.2026, Details in `apps/pantheon/opencloud/UPSTREAM.md`). Version 1.1 ist gegen den Repository-Stand vom 16.11.2026 abgeglichen (Commit `1a72f8c`): Gateway nur mit HTTP-Listener `http`, cert-manager über `infrastructure-cert-manager`, Tunnel `pantheon-apps` mit Catch-all auf `cilium-gateway-pantheon-gateway:80`, `.sops.yaml` verschlüsselt `data`/`stringData` in jeder `*.yaml`, IONOS-SMTP für AFFiNE live seit 13.11.2026 (SPF, DKIM `s1-ionos`, DMARC `p=none`). Faktenbasis OpenCloud: Dokumentation 7.2 (Keycloak-, External-IdP-, PosixFS-, Notifications-, App-Token-, Link-Passwort-Seiten), README von `opencloud-eu/opencloud-compose`, Releases `opencloud-eu/opencloud` (7.2.3 vom 06.08.2026), rclone-WebDAV-Doku. Was sich nur aus den Compose-Dateien selbst ergibt (Images, Realm-Datei, LDAP-Seed, CSP), gleicht Claude Code in **Teil 0** gegen das Upstream-Repo ab und trägt es ein. Nach jedem Block die Erwartungswerte mit den echten Ausgaben abgleichen (Ergebnisprotokoll am Blockende).
 
@@ -109,7 +109,7 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 | A ✅ 16.11.2026 | Cloudflare-Token, alle Grund-Secrets inkl. SMTP | ~15 Min | Prüfung `ENC[` | — | keine |
 | B ✅ 16.11.2026 | Wildcard-Zertifikat, HTTPS-Listener am Gateway | — | ~30 Min | 0 | HTTPS im LAN für `*.rm-it.org` |
 | C ✅ 17.11.2026 | Keycloak-DB, Keycloak mit SMTP, Routen | ~15 Min | ~40 Min | 1 | Identität läuft (LAN), Keycloak sendet Mails |
-| D | OpenCloud mit Mail-Benachrichtigungen, WOPI, Collabora, Routen, Renovate | ~10 Min | ~40 Min | 1 | OpenCloud im LAN nutzbar |
+| D ✅ 18.11.2026 | OpenCloud mit Mail-Benachrichtigungen, WOPI, Collabora, Routen, Renovate | ~10 Min | ~40 Min | 1 | OpenCloud im LAN nutzbar |
 | E | Sicherheits-Gate, DNS-Routen, externe Prüfungen, Geräte | ~20 Min | ~20 Min | 2 | von außen + Apps |
 | F | Dropbox-Zugang, Testkopie, Vollkopie starten | ~20 Min | ~30 Min + Laufzeit (Tage) | 1 | Kopie läuft im Hintergrund |
 | G | Delta-Lauf, Hash-Prüfung, Bericht | — | ~30 Min | 0 | — |
@@ -485,6 +485,8 @@ grep -rn 'image: .*rclone' apps/pantheon/paperless/ | head -3
 Keycloak-, Collabora-, Tika- und LDAP-Tags kommen aus 0.4 (Upstream-Stand), jeweils auf den neuesten **Patch derselben Linie** gehoben, wenn verfügbar. Für rclone den Tag nehmen, den Paperless nutzt, sofern er nicht älter als eine Minor-Version ist — dann hebt Renovate beide gemeinsam.
 
 > **⚠️ Stolperstein 16 — `opencloud-rolling` ist nicht die Production-Linie.** Rolling-Releases sind die schnelle Linie mit Features vor der Stabilisierung. Für eine Dateiablage nur `opencloudeu/opencloud:<X.Y.Z>`.
+
+> **Nachtrag 18.11.2026 — Production-Linie gewechselt.** Seit 17.11.2026 ist **9.1.1** die stable/Production-Linie (`opencloudeu/opencloud:9.1.1`); der Update-Kanal (`https://update.opencloud.eu/server.json`, `channels.stable`) markiert 7.2.0–7.2.5 als kritisch. Pantheon läuft seit Block D auf 9.1.1. Die Release-Notes von 9.1.1 kündigen an: **Production-Releases ab April 2027 nur noch mit Abonnement**, Rolling bleibt frei — Entscheidung unter „Bewusst zurückgestellt", Punkt 0. Prüfung vor jeder Linienwahl: `curl -s https://update.opencloud.eu/server.json | jq .channels.stable`.
 
 ## 0.4 — Upstream-Compose auslesen
 
@@ -1427,7 +1429,7 @@ spec:
 
 ## D.3 — Konfigurationsdateien (`apps/pantheon/opencloud/opencloud/config/`)
 
-Aus Upstream `config/opencloud/` übernehmen, was `docker-compose.yml` mountet (Teil 0.4 f) — mindestens die **CSP-Datei**. Darin alle Upstream-Domains durch Pantheon-Hostnamen ersetzen; `connect-src` muss `https://keycloak.rm-it.org`, `frame-src` muss `https://collabora.rm-it.org` erlauben. Als `configMapGenerator` `opencloud-config-files` einbinden — der Hash-Suffix sorgt dafür, dass eine Änderung den Pod neu ausrollt.
+Aus Upstream `config/opencloud/` übernehmen, was `docker-compose.yml` mountet (Teil 0.4 f): **`csp.yaml`** und **`banned-password-list.txt`** (für `OC_PASSWORD_POLICY_BANNED_PASSWORDS_LIST`). `apps.yaml` (nur Karten-App) und `proxy.yaml` (yjs/Radicale, nicht gemountet) entfallen; Companion- und Euro-Office-Einträge aus der CSP entfernen. Darin alle Upstream-Domains durch Pantheon-Hostnamen ersetzen; `connect-src` muss `https://keycloak.rm-it.org`, `frame-src` muss `https://collabora.rm-it.org` erlauben. Als `configMapGenerator` `opencloud-config-files` einbinden — der Hash-Suffix sorgt dafür, dass eine Änderung den Pod neu ausrollt.
 
 > **⚠️ Stolperstein 21 — CSP mit falscher Domain.** Login-Weiterleitung oder Collabora-Fenster bleiben leer, die Browser-Konsole meldet „Content Security Policy". Ursache ist fast immer ein übrig gebliebener `*.opencloud.test`-Eintrag.
 
@@ -1470,7 +1472,7 @@ spec:
         - name: init
           # Gleicher Tag wie der Container unten — Renovate hebt beide in einem Pull Request.
           # renovate: datasource=docker depName=docker.io/opencloudeu/opencloud
-          image: docker.io/opencloudeu/opencloud:7.2.5
+          image: docker.io/opencloudeu/opencloud:9.1.1
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh", "-c"]
           args:
@@ -1479,7 +1481,7 @@ spec:
                 echo "opencloud.yaml vorhanden - init uebersprungen"
                 exit 0
               fi
-              exec opencloud init __INIT_FLAGS__
+              exec opencloud init --insecure false   # Teil 0.4: nicht-interaktiv, Zertifikatspruefung an
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -1490,7 +1492,7 @@ spec:
       containers:
         - name: opencloud
           # renovate: datasource=docker depName=docker.io/opencloudeu/opencloud
-          image: docker.io/opencloudeu/opencloud:7.2.5
+          image: docker.io/opencloudeu/opencloud:9.1.1
           imagePullPolicy: IfNotPresent
           command: ["opencloud"]
           args: ["server"]
@@ -1568,6 +1570,14 @@ spec:
             # --- Uploads und Freigaben ---
             - name: FRONTEND_UPLOAD_MAX_CHUNK_SIZE
               value: "10000000"          # Default 10 MB, explizit: muss unter Cloudflares 100 MB bleiben
+            - name: FRONTEND_ARCHIVER_MAX_SIZE
+              value: "10000000000"       # wie Upstream: Ordner bis 10 GB als ZIP herunterladen (Default 1 GiB)
+            - name: OC_PASSWORD_POLICY_BANNED_PASSWORDS_LIST
+              value: banned-password-list.txt   # wie Upstream, Datei aus D.3 unter /etc/opencloud
+            - name: OC_DEFAULT_LANGUAGE
+              value: de
+            - name: IDM_CREATE_DEMO_USERS
+              value: "false"             # Default, explizit (Stolperstein 1)
             - name: OC_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD
               value: "true"              # Default, explizit: öffentliche Links nur mit Passwort
             # --- Mail-Benachrichtigungen über IONOS (Architekturentscheidung 8) ---
@@ -1622,7 +1632,10 @@ spec:
               mountPath: /etc/opencloud/csp.yaml
               subPath: csp.yaml
               readOnly: true
-            # weitere Dateien aus D.3 analog per subPath
+            - name: config-files
+              mountPath: /etc/opencloud/banned-password-list.txt
+              subPath: banned-password-list.txt
+              readOnly: true
           resources:
             requests:
               memory: 768Mi
@@ -1681,6 +1694,7 @@ spec:
     spec:
       enableServiceLinks: false
       securityContext:
+        fsGroup: 1001                    # Benutzer cool im Image; liest den Prüfschlüssel (defaultMode 0440)
         seccompProfile:
           type: RuntimeDefault
       hostAliases:
@@ -1690,7 +1704,7 @@ spec:
       containers:
         - name: collabora
           # renovate: datasource=docker depName=docker.io/collabora/code
-          image: docker.io/collabora/code:__COLLABORA_TAG__
+          image: docker.io/collabora/code:26.04.6.1.1
           imagePullPolicy: IfNotPresent
           env:
             - name: aliasgroup1
@@ -1704,6 +1718,8 @@ spec:
                 --o:welcome.enable=false
                 --o:admin_console.enable=false
                 --o:net.frame_ancestors=cloud.rm-it.org
+                --o:net.lok_allow.host[14]=cloud.rm-it.org
+                --o:ssl.ssl_verification=true
                 --o:home_mode.enable=true
           ports:
             - name: http
@@ -1719,10 +1735,19 @@ spec:
               path: /hosting/discovery
               port: http
             periodSeconds: 30
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              add: ["MKNOD"]           # Teil 0.4 g: exakt wie Upstream cap_add
+          # Rechte wie Default des offiziellen Collabora-Helm-Charts (UPSTREAM.md, Entscheidung 18.11.2026):
+          # Standard-Capabilities des Containers (u. a. MKNOD, SYS_CHROOT, CHOWN, FOWNER), kein SYS_ADMIN.
+          # allowPrivilegeEscalation bewusst NICHT false: coolforkit erhält seine Rechte über Datei-Capabilities.
+          # Ohne SYS_ADMIN kopiert Collabora die Jail-Vorlage statt sie einzuhängen (langsamerer erster Start).
+          volumeMounts:
+            - name: proof-key           # fester WOPI-Prüfschlüssel; OpenCloud cached den öffentlichen Teil 12 h
+              mountPath: /etc/coolwsd/proof_key
+              subPath: proof_key
+              readOnly: true
+            - name: proof-key
+              mountPath: /etc/coolwsd/proof_key.pub
+              subPath: proof_key.pub
+              readOnly: true
           resources:
             requests:
               memory: 512Mi
@@ -1730,6 +1755,11 @@ spec:
             limits:
               memory: 2Gi
               cpu: "2"
+      volumes:
+        - name: proof-key
+          secret:
+            secretName: collabora-proof-key
+            defaultMode: 0440
 ---
 apiVersion: v1
 kind: Service
@@ -1751,7 +1781,34 @@ spec:
 | `ssl.enable=false`, `ssl.termination=true` | TLS endet am Gateway bzw. bei Cloudflare; Collabora erzeugt trotzdem `https`-URLs. |
 | `admin_console.enable=false` | Die Collabora-Admin-Konsole wäre öffentlich erreichbar — sie wird nicht gebraucht, also aus. Spart zugleich ein Admin-Passwort. |
 | `net.frame_ancestors` | Collabora darf nur in OpenCloud eingebettet werden. |
-| `home_mode.enable` | Für Heimnutzung vorgesehener Modus (begrenzte Verbindungen, keine Support-Hinweise). In Teil 0.4 g gegen Upstream prüfen; fehlt die Option in der Version, Zeile streichen. |
+| `home_mode.enable` | Für Heimnutzung vorgesehener Modus (begrenzte Verbindungen, keine Support-Hinweise). Option existiert in 26.04 (Upstream-Default `false`). |
+| `net.lok_allow.host[14]`, `ssl.ssl_verification=true` | wie Upstream: Collabora darf `cloud.rm-it.org` für eingebettete Inhalte ansprechen und prüft dessen Zertifikat (gültig über `hostAliases`). |
+| Rechte (kein `securityContext` am Container) | wie Default des offiziellen Collabora-Helm-Charts: Standard-Capabilities des Containers, kein `SYS_ADMIN`, `allowPrivilegeEscalation` nicht `false` (Datei-Capabilities von `coolforkit`). `baseline`-konform (Stolperstein 33). |
+| Secret `collabora-proof-key` | fester WOPI-Prüfschlüssel (Rico, Block D). OpenCloud cached den öffentlichen Schlüssel 12 h und lädt bei Fehlschlag nicht neu — ein neuer Schlüssel je Neustart hieße bis zu 12 h „Dokument lässt sich nicht öffnen". |
+
+**Secret `collabora-proof-key` (Rico, eigenes Terminal, ohne Eingabe):**
+
+```bash
+(
+cd ~/k8s-cluster || exit 1
+umask 077
+F=apps/pantheon/opencloud/collabora-proof-key-secret.yaml
+test -e "$F" && { echo "ABBRUCH: $F existiert schon"; exit 1; }
+T=$(mktemp -d) || exit 1
+trap 'rm -rf "$T"' EXIT
+openssl genrsa -traditional -out "$T/proof_key" 4096 2>/dev/null || { echo "ABBRUCH: genrsa"; exit 1; }
+openssl rsa -in "$T/proof_key" -pubout -out "$T/proof_key.pub" 2>/dev/null || { echo "ABBRUCH: pubout"; exit 1; }
+head -1 "$T/proof_key"; head -1 "$T/proof_key.pub"
+kubectl create secret generic collabora-proof-key -n opencloud \
+  --from-file=proof_key="$T/proof_key" --from-file=proof_key.pub="$T/proof_key.pub" \
+  --dry-run=client -o yaml > "$F"
+sops --encrypt --in-place "$F" || { rm -f "$F"; echo "ABBRUCH: sops, Datei entfernt"; exit 1; }
+grep -c 'ENC\[' "$F"
+)
+# Erwartung: -----BEGIN RSA PRIVATE KEY----- / -----BEGIN PUBLIC KEY----- / 3
+```
+
+> **⚠️ Stolperstein 33 — Collabora meldet „Bind-Mount nicht möglich".** Ohne `SYS_ADMIN` kopiert Collabora die Jail-Vorlage (`Using Bind Mounting: false`, im Serverbericht ein roter Punkt „Langsame Einrichtung des Kit-Jails mit Kopieren"). Erwartet und akzeptiert: die Dokumente sind trotzdem per Capabilities und chroot isoliert („Jedes Dokument ist sicher eingeschlossen"), Start eines Dokumentcontainers ~0,7 s. Kein Grund, `privileged` zu setzen.
 
 ## D.6 — Routen (`apps/pantheon/opencloud/httproutes.yaml`, ergänzen)
 
@@ -1908,22 +1965,26 @@ kubectl exec -n opencloud deploy/opencloud -c opencloud -- sh -c 'ls -la /var/li
 # Ergebnis als SPACE_PATH (absoluter Pfad im Container) in UPSTREAM.md notieren.
 ```
 
+> **⚠️ Stolperstein 32 — `opencloud init` schreibt ein Admin-Passwort ins Log.** Der initContainer gibt `user: admin` und ein Passwort im Klartext aus (`kubectl logs … -c init`). Das Konto entsteht wegen `OC_ADMIN_USER_ID=""` nicht (Gegenprobe D.9: Benutzerliste ohne `admin`), der Wert ist also wertlos — trotzdem Init-Logs nur gefiltert lesen (`grep -viE 'password|secret'`) und nicht weitergeben.
+
+> **⚠️ Stolperstein 34 — Keycloak zeigt geerbte Rollen nicht.** Unter *Users → Konto → Role mapping* steht nur `default-roles-opencloud`; die darin enthaltene `opencloudGuest` erscheint erst ohne den Haken *Hide inherited roles*. Maßgeblich ist *Realm settings → User registration → Default roles*. Gäste brauchen **keine** zusätzliche Zuweisung (eine doppelte schadet nicht).
+
 > **⚠️ Stolperstein 7 — Lange Starts.** PosixFS liest beim Start den ganzen Baum. Bei leerem Volume dauert das Sekunden, nach der Migration Minuten. Darum `startupProbe` bis 30 Min und keine `livenessProbe`. Jedes Update bedeutet entsprechend längere Unterbrechung (Teil L).
 
 ### Ergebnisprotokoll Block D
 
 | Prüfpunkt | Erwartung | Ist |
 |---|---|---|
-| `status.php` | installed true, 7.2.x | |
-| Issuer über OpenCloud / WebFinger | Keycloak-Realm | |
-| Server-zu-Server Keycloak | JSON | |
-| Collabora-Discovery | 200 | |
-| Login + OTP, „Meine Dateien" | ok | |
-| Collabora .docx | ok | |
-| Upload/Download > 1 GB | ok | |
-| Freigabe-Mail an `testgast` (über Weiterleitung) | angekommen | |
-| `SPACE_PATH` | Pfad | |
-| Benutzerliste (Autoprovisioning) | `rico`, `testgast`; kein `admin` | |
+| `status.php` | installed true, 7.2.x → seit 18.11.2026 9.1.x | ✅ 9.1.1, Edition `stable` (erst 7.2.5, dann Neuinstallation 9.1.1) |
+| Issuer über OpenCloud / WebFinger | Keycloak-Realm | ✅ beide `https://keycloak.rm-it.org/realms/openCloud` |
+| Server-zu-Server Keycloak | JSON | ✅ JSON; Collabora-Discovery aus dem Pod 200 |
+| Collabora-Discovery | 200 | ✅ 200; `/wopi/` 418 (WOPI-Dienst); Prüfschlüssel veröffentlicht, Modulus beginnt `upyshV/yvCpr` |
+| Login + OTP, „Meine Dateien" | ok | ✅ (in 9.1 „Persönlich"); Administration vorhanden; Kontingent unbegrenzt |
+| Collabora .docx | ok | ✅ (als `.odt` getestet); Serverbericht: 1 Alarm Bind-Mount (Stolperstein 33), Dokumentcontainer 669 ms |
+| Upload/Download > 1 GB | ok | ✅ 1,2 GB Zufallsdaten, SHA-256 identisch; vorher 330 MB ok. Langsamer Editor-Aufbau während paralleler Übertragung = 2,4-GHz-WLAN des Macs, nicht Server |
+| Freigabe-Mail an `testgast` (über Weiterleitung) | angekommen | ✅ angekommen, nicht im Spam; `testgast` ohne „Persönlich" (Gast) |
+| `SPACE_PATH` | Pfad | `/var/lib/opencloud/storage/users/users/2c5b753a-5737-47a7-98b3-be001286b788` (Space-ID, nicht Benutzername) |
+| Benutzerliste (Autoprovisioning) | `rico`, `testgast`; kein `admin` | ✅ nur `rico`, nach 5b zusätzlich `testgast`; Log: `Createhome PERMISSION_DENIED` bei Gast-Login (erwartet) |
 
 ---
 
@@ -2871,6 +2932,17 @@ Den ermittelten Befehl **einmal** per `kubectl exec` starten (Freigabe-Klick). E
 
 **Grundsätze** (wie AFFiNE F.2): Tags gepinnt, `IfNotPresent`, Renovate-Regeln aus D.7. `init` und `opencloud` tragen **immer denselben Tag** — Renovate hebt beide Zeilen im selben Pull Request; beim manuellen Editieren beide ändern.
 
+### L.2a — Linien- oder Minor-Wechsel mit Konfigurations-Patch
+
+Die Upgrade-Guides verlangen bei Linienwechseln `opencloud init --diff` (Beispiel 7.2 → 9.1: neues Dienstkonto `auth_guest.service_account`; ohne Patch startet 9.1 nicht: `guestlinks: service_account_id must not be empty`). Der initContainer überspringt `init`, sobald `opencloud.yaml` existiert — der Patch kommt also **nicht** von selbst. Ablauf (Rico/Claude Code gemeinsam, Wartungsfenster):
+
+1. QNAP-Snapshot von Daten- und Config-LUN (Rico).
+2. Claude Code: Release-Notes und Upgrade-Guide lesen, Stolpersteine ins Rezept.
+3. Patch erzeugen und prüfen: Wegwerf-Pod mit dem **neuen** Image, Config-PVC eingehängt, `opencloud init --diff` (Ausgabe prüfen — enthält Secrets, nur zusammengefasst berichten). Der Pod braucht das RWO-Volume: OpenCloud dafür per Commit auf `replicas: 0`.
+4. Patch anwenden (`patch` im selben Pod), Tag-Bump committen, `replicas: 1`, Prüfungen D.8.
+
+> Am 18.11.2026 nicht angewandt: die Instanz war leer, deshalb Neuinstallation (PVCs per Commit entfernt und neu angelegt).
+
 ## L.3 — Rückweg bei misslungenem OpenCloud-Upgrade
 
 1. `kubectl scale deploy/opencloud -n opencloud --replicas=0`
@@ -2926,6 +2998,8 @@ Den ermittelten Befehl **einmal** per `kubectl exec` starten (Freigabe-Klick). E
 
 Reihenfolge = empfohlene Priorität, jeweils mit dem Risiko bis dahin.
 
+0. **OpenCloud-Bezugsquelle ab April 2027 — Entscheidung bis 31.03.2027.** Laut Release-Notes 9.1.1 gibt es Production-Releases ab April 2027 nur mit Abonnement; Rolling (`opencloud-rolling`, alle ~3 Wochen, Major-Sprünge mit Upgrade-Anleitung) bleibt frei. Optionen: Abonnement, Wechsel auf Rolling (Renovate-Regel und Teil L anpassen, höherer Pflegeaufwand), Alternative. Offen und vorher zu klären: ob veröffentlichte Production-Tags abrufbar bleiben und wie lange 9.1 Fixes bekommt (in der Doku nicht beantwortet, Stand 18.11.2026). *Risiko:* ohne Entscheidung keine Sicherheits-Updates mehr für eine öffentlich erreichbare Dateiablage.
+
 1. **Cloudflare-Rate-Limit auf den Keycloak-Login** (eine Regel im Free-Plan). *Risiko:* Brute-Force-Versuche erreichen Keycloak; dessen Sperre greift, erzeugt aber Last und Log-Rauschen.
 2. **Monitoring.** Sensor „Alter von `offsite:last-success` > 36 h" und Pod-Neustarts im Namespace `opencloud` für das Monitoring-Rezept (CT 110–112). *Risiko:* ein still scheiternder Off-site-Lauf fällt erst bei der monatlichen Probe auf (Paperless-Erfahrung: 33 Tage).
 3. **DMARC verschärfen** (`p=none` → `p=quarantine`), sobald alle Absender der Domain (AFFiNE, Keycloak, OpenCloud) eine Woche lang `dkim=pass` zeigen. *Risiko bis dahin:* gefälschte Mails mit Absender `@rm-it.org` werden von Empfängern nicht aussortiert.
@@ -2947,6 +3021,7 @@ Reihenfolge = empfohlene Priorität, jeweils mit dem Risiko bis dahin.
 - **0.6 Verlauf (17.11.2026):** Transfer lag in einem eigenen SSD-Pool (kein Gewinn für Pool 1); nach Abyss Of Hel (100 GB) und TimeMachine (1,5 TB) 4,4 TB frei → Eingang Block F erfüllt. UrdaSot-Archiv mit **rclone crypt vom Mac** statt HBS 3 (HBS-3-WebDAV verbindet nicht mit Hetzner, Zugangsdaten per `curl` bestätigt); Upload über 2,4-GHz-WLAN langsam und anfangs mit SMB-Timeouts → `--transfers 2 --checkers 4 --bwlimit 3.5M`.
 - **Neu 0.6 (Rico):** Speicher im QNAP-Pool freiräumen (Transfer löschen, Abyss Of Hel und TimeMachine verkleinern, UrdaSot verschlüsselt auf die Storage Box archivieren und löschen). Teil 0 hatte 2,5 TB frei gegen 3,6 TB Bedarf gemessen. Block F prüft das als Eingang; das Archiv belegt voraussichtlich den Storage-Box-Sub-Account `u620152-sub2`, Block H nutzt deshalb `u620152-sub3`; Block J deaktiviert den HBS-3-Spiegel PrivateCloud und entfernt das Volume mit dem Konto-Löschen.
 - **Block C (17.11.2026):** Stolperstein 29 (Upstream-Realm enthält echte Schlüssel → `KeyProvider` löschen, Prüfung `[0,0,0]`, Gegenprobe C.4/5), Stolperstein 30 (Dateiname = Realm-Name, `configMapGenerator` mit Schlüssel `openCloud-realm.json`), Stolperstein 31 (Route `keycloak-master-lan` nur am HTTPS-Listener für die Admin-Konsole), `loginTheme` geleert; C.5 mit Konto `rico-admin` und Hinweis zu grauem *Test connection*.
+- **Block D (18.11.2026):** Neuinstallation auf **Production 9.1.1** (neue stable-Linie seit 17.11.2026, 7.2.0–7.2.5 im Update-Kanal kritisch; Architektur gegen den 9.1.1-Quelltext geprüft) per zwei Commits statt Upgrade mit Config-Patch; L.2a beschreibt den Patch-Weg für spätere Upgrades. Collabora: Rechte wie Helm-Chart-Default (kein `SYS_ADMIN`, `allowPrivilegeEscalation` nicht `false`), fester WOPI-Prüfschlüssel aus Secret `collabora-proof-key` (OpenCloud cached 12 h ohne Neuladen), `net.lok_allow.host`, `ssl.ssl_verification`. Pflicht-Abgleich: `IDM_CREATE_DEMO_USERS`, `FRONTEND_ARCHIVER_MAX_SIZE`, Liste gesperrter Link-Passwörter, `OC_DEFAULT_LANGUAGE=de`. D.4/D.5 im Rezept = tatsächliche Manifeste. Stolpersteine 32 (Admin-Passwort im Init-Log), 33 (Bind-Mount-Alarm akzeptiert), 34 (geerbte Rollen in Keycloak verborgen); Stolperstein 16 und „Bewusst zurückgestellt" Punkt 0 (Bezugsquelle ab April 2027). Renovate-Regeln für OpenCloud, Keycloak, Collabora.
 - **Korrekturen:** OpenCloud-Tag 7.2.3 → 7.2.5; Laufzeitformel in 0.5 mit × 8000 statt × 8 (GB → Mbit).
 - **A.2 in vier Schritte geteilt** (Eingaben einzeln, wie am 16.11.2026 ausgeführt): eine Passwortabfrage im selben Einfügeblock wie weitere Zeilen frisst sonst die Folgezeilen als Eingabe. Bootstrap-Admin-Passwort mit sprechendem Namen.
 
