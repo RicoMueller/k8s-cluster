@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collabora
+  namespace: opencloud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: collabora
+  template:
+    metadata:
+      labels:
+        app: collabora
+    spec:
+      enableServiceLinks: false
+      securityContext:
+        fsGroup: 1001                    # Benutzer cool im Image; liest den Prüfschlüssel (defaultMode 0440)
+        seccompProfile:
+          type: RuntimeDefault
+      hostAliases:
+        - ip: 192.168.178.224
+          hostnames:
+            - cloud.rm-it.org
+      containers:
+        - name: collabora
+          # renovate: datasource=docker depName=docker.io/collabora/code
+          image: docker.io/collabora/code:26.04.6.1.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: aliasgroup1
+              value: https://cloud.rm-it.org:443   # WOPI-Host = OpenCloud selbst (Pfad /wopi)
+            - name: DONT_GEN_SSL_CERT
+              value: "YES"
+            - name: extra_params
+              value: >-
+                --o:ssl.enable=false
+                --o:ssl.termination=true
+                --o:welcome.enable=false
+                --o:admin_console.enable=false
+                --o:net.frame_ancestors=cloud.rm-it.org
+                --o:net.lok_allow.host[14]=cloud.rm-it.org
+                --o:ssl.ssl_verification=true
+                --o:home_mode.enable=true
+          ports:
+            - name: http
+              containerPort: 9980
+          startupProbe:
+            httpGet:
+              path: /hosting/discovery
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /hosting/discovery
+              port: http
+            periodSeconds: 30
+          # Rechte wie Default des offiziellen Collabora-Helm-Charts (UPSTREAM.md, Entscheidung 18.11.2026):
+          # Standard-Capabilities des Containers (u. a. MKNOD, SYS_CHROOT, CHOWN, FOWNER), kein SYS_ADMIN.
+          # allowPrivilegeEscalation bewusst NICHT false: coolforkit erhält seine Rechte über Datei-Capabilities.
+          # Ohne SYS_ADMIN kopiert Collabora die Jail-Vorlage statt sie einzuhängen (langsamerer erster Start).
+          volumeMounts:
+            - name: proof-key           # fester WOPI-Prüfschlüssel; OpenCloud cached den öffentlichen Teil 12 h
+              mountPath: /etc/coolwsd/proof_key
+              subPath: proof_key
+              readOnly: true
+            - name: proof-key
+              mountPath: /etc/coolwsd/proof_key.pub
+              subPath: proof_key.pub
+              readOnly: true
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 250m
+            limits:
+              memory: 2Gi
+              cpu: "2"
+      volumes:
+        - name: proof-key
+          secret:
+            secretName: collabora-proof-key
+            defaultMode: 0440
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: collabora
+  namespace: opencloud
+spec:
+  selector:
+    app: collabora
+  ports:
+    - name: http
+      port: 9980
+      targetPort: 9980

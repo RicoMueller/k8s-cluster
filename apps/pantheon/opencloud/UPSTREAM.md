@@ -123,11 +123,29 @@ Nicht als Upstream-Compose erprobt (Upstream `idm/external-idp.yml` nutzt ein ex
 | 4 | **Formel Laufzeit (Rezept 0.5):** Faktor 1000 fehlte. | Korrigiert in Rezept 1.2 (`× 8000`) |
 | 5 | **PrivateCloud (HBS-3-Spiegel) 1,34 TB < Dropbox 1690 GB** — Spiegel vermutlich unvollständig. | Kein Ersatz für Migration und Hash-Prüfung; Volume wird in Block J entfernt |
 
-## Offen für Block D (vor D.5 entscheiden)
+## Block D — Entscheidungen (Rico, 18.11.2026)
 
-- **Collabora-Capabilities:** Rezept D.5 setzt `add: ["MKNOD"]` mit Verweis „exakt wie Upstream". Upstream setzt inzwischen `cap_add: SYS_ADMIN` und `seccomp=unconfined`, `apparmor:unconfined`. Beides ist mit PodSecurity `baseline` nicht vereinbar (`SYS_ADMIN` nicht erlaubt, `Unconfined` verboten). Vorschlag für Block D: `baseline` beibehalten, ohne `SYS_ADMIN` starten (Collabora nutzt dann kopierte statt eingehängter Jails, langsamerer Dokumentstart) und das Verhalten in D.9 prüfen.
-- **WOPI-Proof-Key:** Upstream erzeugt einmalig einen 4096-Bit-RSA-Schlüssel und hängt ihn nach `/etc/coolwsd/proof_key` ein (fester Schlüssel über Neustarts). Rezept D.5 hat keinen; Collabora erzeugt sonst bei jedem Start einen eigenen. Vorschlag: in Block D prüfen, ob OpenCloud 7.2.5 Proof-Keys überhaupt validiert; erst dann über ein Secret (Rico) entscheiden.
-- `home_mode.enable` existiert in Upstream (dort Default `false`), Rezept setzt `true` — bleibt.
+**Collabora-Capabilities** — wie Default des offiziellen Helm-Charts `CollaboraOnline/online` `kubernetes/helm/collabora-online` (`securityContext: {}`): Standard-Capabilities des Containers (u. a. `MKNOD`, `SYS_CHROOT`, `CHOWN`, `FOWNER`), **kein** `SYS_ADMIN`, `allowPrivilegeEscalation` nicht auf `false` (Datei-Capabilities von `coolforkit`), Seccomp `RuntimeDefault`. PodSecurity `baseline` bleibt erfüllt. Upstream-Compose (`SYS_ADMIN`, `seccomp=unconfined`, `apparmor:unconfined`) wäre nur mit `privileged` möglich. Folge: Collabora kopiert die Jail-Vorlage statt sie einzuhängen (langsamerer erster Dokumentstart) — Prüfung D.8/D.9.
+
+**WOPI-Prüfschlüssel** — wird gebraucht. 7.2.5 prüft Proof-Keys per Default (`COLLABORATION_APP_PROOF_DISABLE=false`), cached den öffentlichen Schlüssel aus `/hosting/discovery` 12 h (`COLLABORATION_APP_PROOF_DURATION`) und lädt bei fehlgeschlagener Prüfung **nicht** neu (`services/collaboration/pkg/proofkeys/handler.go`, Verify) → nach einem Collabora-Neustart mit neuem Schlüssel bis zu 12 h HTTP 500 beim Öffnen. Umsetzung wie `proofKeysSecretRef` des Helm-Charts (für GitOps empfohlen): Secret `collabora-proof-key` (Rico, 4096 Bit, `-traditional`, SOPS) mit `proof_key` und `proof_key.pub`, per `subPath` nach `/etc/coolwsd/`, `defaultMode 0440`, Pod-`fsGroup 1001`.
+
+**Pflicht-Abgleich D.4** (Upstream `docker-compose.yml`, `weboffice/collabora.yml`, `idm/external-idp.yml` gegen 7.2.5):
+
+| Variable | Umsetzung |
+|---|---|
+| `IDM_CREATE_DEMO_USERS=false` | übernommen (Default, explizit; Stolperstein 1) |
+| `FRONTEND_ARCHIVER_MAX_SIZE=10000000000` | übernommen (Default 1 GiB) |
+| `OC_PASSWORD_POLICY_BANNED_PASSWORDS_LIST` + `banned-password-list.txt` | übernommen (ConfigMap `opencloud-config-files`) |
+| `OC_DEFAULT_LANGUAGE` | `de` |
+| `WEBFINGER_*_OIDC_CLIENT_ID/SCOPES` | nicht gesetzt — 7.2.5-Defaults = Client-IDs der Realm-Datei; Rollen-Claim kommt über den Default-Scope `roles` |
+| `FRONTEND_APP_HANDLER_SECURE_VIEW_APP_ADDR`, `GRAPH_AVAILABLE_ROLES` | weggelassen — „Sicher ansehen" nicht benötigt; Upstream-Liste enthält die Rolle selbst nicht |
+| `OC_GRPC_MAX_RECEIVED_MESSAGE_SIZE` | Default; erst bei `grpc: received message larger than max` (viele Dateien je Ordner, Migration) anheben |
+| `OC_LOG_COLOR`, `OC_LOG_PRETTY`, `PROXY_ENABLE_BASIC_AUTH`, Passwortregeln, `CHECK_FOR_UPDATES` | Defaults (identisch) |
+| `COLLABORA_DOMAIN`, `IDP_DOMAIN`, `TRAEFIK_PORT_HTTPS` | nicht nötig — `csp.yaml` enthält die Hostnamen direkt |
+
+**Collabora zusätzlich wie Upstream:** `--o:net.lok_allow.host[14]=cloud.rm-it.org`, `--o:ssl.ssl_verification=true` (gültiges Let's-Encrypt-Zertifikat über `hostAliases`). `home_mode.enable=true` bleibt (Rezept).
+
+**CSP** (`opencloud/config/csp.yaml`): aus Upstream, Vorlagenvariablen durch `keycloak.rm-it.org`/`collabora.rm-it.org` ersetzt, Companion- und Euro-Office-Einträge entfernt. `apps.yaml` (nur Karten-App) und `proxy.yaml` (yjs/Radicale) nicht übernommen.
 
 ## Abhängigkeiten der Kündigung (`DROPBOX_APPS`)
 

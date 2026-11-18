@@ -1,0 +1,217 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencloud
+  namespace: opencloud
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate                       # RWO-Volumes: alter Pod muss erst loslassen
+  selector:
+    matchLabels:
+      app: opencloud
+  template:
+    metadata:
+      labels:
+        app: opencloud
+    spec:
+      enableServiceLinks: false          # AFFiNE-/Paperless-Lehre: keine OPENCLOUD_*-Service-Variablen
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch   # Pflicht bei 2 TB: kein rekursives chown je Start
+        seccompProfile:
+          type: RuntimeDefault
+      hostAliases:                       # Server-zu-Server über das Gateway, nicht übers Internet
+        - ip: 192.168.178.224
+          hostnames:
+            - cloud.rm-it.org
+            - keycloak.rm-it.org
+            - collabora.rm-it.org
+      initContainers:
+        - name: init
+          # Gleicher Tag wie der Container unten — Renovate hebt beide in einem Pull Request.
+          # renovate: datasource=docker depName=docker.io/opencloudeu/opencloud
+          image: docker.io/opencloudeu/opencloud:7.2.5
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              if [ -f /etc/opencloud/opencloud.yaml ]; then
+                echo "opencloud.yaml vorhanden - init uebersprungen"
+                exit 0
+              fi
+              exec opencloud init --insecure false   # Teil 0.4: nicht-interaktiv, Zertifikatspruefung an
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/opencloud
+      containers:
+        - name: opencloud
+          # renovate: datasource=docker depName=docker.io/opencloudeu/opencloud
+          image: docker.io/opencloudeu/opencloud:7.2.5
+          imagePullPolicy: IfNotPresent
+          command: ["opencloud"]
+          args: ["server"]
+          env:
+            # --- Grundlagen, hinter TLS-terminierendem Gateway ---
+            - name: OC_URL
+              value: https://cloud.rm-it.org
+            - name: OC_LOG_LEVEL
+              value: info
+            - name: OC_INSECURE
+              value: "false"             # gültige Zertifikate auf allen Hostnamen (Block B)
+            - name: PROXY_TLS
+              value: "false"
+            - name: PROXY_HTTP_ADDR
+              value: 0.0.0.0:9200
+            - name: PROXY_ENABLE_BASIC_AUTH
+              value: "false"
+            - name: PROXY_ENABLE_APP_AUTH
+              value: "true"              # App-Tokens (rclone-Migration)
+            - name: PROXY_CSP_CONFIG_FILE_LOCATION
+              value: /etc/opencloud/csp.yaml
+            # --- Externer IdP: Keycloak, Autoprovisioning ins eingebaute idm (Architekturentscheidung 3) ---
+            - name: OC_EXCLUDE_RUN_SERVICES
+              value: idp                 # idm läuft (Kontenverzeichnis); nur der eingebaute IdP ist aus
+            - name: OC_OIDC_ISSUER
+              value: https://keycloak.rm-it.org/realms/openCloud
+            - name: PROXY_OIDC_ACCESS_TOKEN_VERIFY_METHOD
+              value: jwt
+            - name: PROXY_OIDC_REWRITE_WELLKNOWN
+              value: "true"
+            - name: WEB_OPTION_ACCOUNT_EDIT_LINK_HREF
+              value: https://keycloak.rm-it.org/realms/openCloud/account
+            - name: PROXY_AUTOPROVISION_ACCOUNTS
+              value: "true"
+            - name: PROXY_USER_OIDC_CLAIM
+              value: sub                 # Keycloak-ID: stabil, auch wenn ein Konto umbenannt wird
+            - name: PROXY_AUTOPROVISION_CLAIM_USERNAME
+              value: sub
+            - name: PROXY_USER_CS3_CLAIM
+              value: username
+            - name: PROXY_ROLE_ASSIGNMENT_DRIVER
+              value: oidc
+            - name: PROXY_ROLE_ASSIGNMENT_OIDC_CLAIM
+              value: roles               # Realm-Rollen aus dem Client-Scope "roles" der Realm-Datei
+            - name: OC_ADMIN_USER_ID
+              value: ""                  # idm legt KEIN Admin-Konto an (Stolperstein 1)
+            - name: SETTINGS_SETUP_DEFAULT_ASSIGNMENTS
+              value: "false"
+            - name: GRAPH_ASSIGN_DEFAULT_USER_ROLE
+              value: "false"
+            - name: GRAPH_USERNAME_MATCH
+              value: none
+            - name: FRONTEND_READONLY_USER_ATTRIBUTES   # Profil und Rollen werden in Keycloak gepflegt
+              value: user.onPremisesSamAccountName,user.displayName,user.mail,user.passwordProfile,user.accountEnabled,user.appRoleAssignments
+            # --- WOPI-Dienst collaboration im selben Prozess (Architekturentscheidung 5, wie Upstream weboffice/collabora.yml) ---
+            - name: COLLABORATION_WOPI_SRC
+              value: https://cloud.rm-it.org   # Proxy-Route /wopi
+            - name: COLLABORATION_APP_NAME
+              value: CollaboraOnline
+            - name: COLLABORATION_APP_PRODUCT
+              value: Collabora
+            - name: COLLABORATION_APP_ADDR
+              value: https://collabora.rm-it.org
+            - name: COLLABORATION_APP_ICON
+              value: https://collabora.rm-it.org/favicon.ico
+            - name: COLLABORATION_APP_INSECURE
+              value: "false"
+            - name: COLLABORATION_CS3API_DATAGATEWAY_INSECURE
+              value: "false"
+            # --- Speicher: PosixFS (Default seit 2.0, hier explizit) ---
+            - name: STORAGE_USERS_DRIVER
+              value: posix
+            - name: STORAGE_USERS_ID_CACHE_STORE
+              value: nats-js-kv
+            # --- Uploads und Freigaben ---
+            - name: FRONTEND_UPLOAD_MAX_CHUNK_SIZE
+              value: "10000000"          # Default 10 MB, explizit: muss unter Cloudflares 100 MB bleiben
+            - name: FRONTEND_ARCHIVER_MAX_SIZE
+              value: "10000000000"       # wie Upstream: Ordner bis 10 GB als ZIP herunterladen (Default 1 GiB)
+            - name: OC_PASSWORD_POLICY_BANNED_PASSWORDS_LIST
+              value: banned-password-list.txt   # wie Upstream, Datei aus D.3 unter /etc/opencloud
+            - name: OC_DEFAULT_LANGUAGE
+              value: de
+            - name: IDM_CREATE_DEMO_USERS
+              value: "false"             # Default, explizit (Stolperstein 1)
+            - name: OC_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD
+              value: "true"              # Default, explizit: öffentliche Links nur mit Passwort
+            # --- Mail-Benachrichtigungen über IONOS (Architekturentscheidung 8) ---
+            # Zusatzdienste: notifications (Mails) und collaboration (WOPI). Variablenname aus Teil 0.4 b.
+            - name: OC_ADD_RUN_SERVICES
+              value: notifications,collaboration
+            - name: NOTIFICATIONS_SMTP_HOST
+              value: smtp.ionos.de
+            - name: NOTIFICATIONS_SMTP_PORT
+              value: "587"
+            - name: NOTIFICATIONS_SMTP_ENCRYPTION
+              value: starttls
+            - name: NOTIFICATIONS_SMTP_AUTHENTICATION
+              value: auto
+            - name: NOTIFICATIONS_SMTP_INSECURE
+              value: "false"
+            - name: NOTIFICATIONS_SMTP_USERNAME
+              value: noreply@rm-it.org
+            - name: NOTIFICATIONS_SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: opencloud-smtp
+                  key: smtp-password
+            # IONOS akzeptiert als Absender nur die Postfach-Adresse (Stolperstein 25).
+            - name: NOTIFICATIONS_SMTP_SENDER
+              value: "Pantheon Cloud <noreply@rm-it.org>"
+          ports:
+            - name: http
+              containerPort: 9200
+          startupProbe:
+            httpGet:
+              path: /status.php
+              port: http
+            periodSeconds: 10
+            failureThreshold: 180        # bis 30 Min: PosixFS wärmt beim Start Caches über den ganzen Baum auf
+          readinessProbe:
+            httpGet:
+              path: /status.php
+              port: http
+            periodSeconds: 15
+          # Bewusst keine livenessProbe: ein Neustart mitten in einem großen Upload kostet mehr, als er hilft.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/opencloud
+            - name: data
+              mountPath: /var/lib/opencloud
+            - name: config-files
+              mountPath: /etc/opencloud/csp.yaml
+              subPath: csp.yaml
+              readOnly: true
+            - name: config-files
+              mountPath: /etc/opencloud/banned-password-list.txt
+              subPath: banned-password-list.txt
+              readOnly: true
+          resources:
+            requests:
+              memory: 768Mi
+              cpu: 250m
+            limits:
+              memory: 3Gi
+              cpu: "2"
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: opencloud-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: opencloud-data
+        - name: config-files
+          configMap:
+            name: opencloud-config-files

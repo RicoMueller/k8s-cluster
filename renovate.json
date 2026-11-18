@@ -65,6 +65,22 @@
       "description": "AFFiNE veroeffentlicht neben X.Y.Z auch beta-, canary-, stable-<hash>- und candidate-<lauf>-Tags. Nur reine Release-Versionen zulassen. Beide image-Zeilen (initContainer migrate + Server) stehen im selben Deployment und werden gemeinsam angehoben.",
       "matchPackageNames": ["ghcr.io/toeverything/affine"],
       "allowedVersions": "/^\\d+\\.\\d+\\.\\d+$/"
+    },
+    {
+      "description": "OpenCloud: nur Production-Image mit reinen X.Y.Z-Tags (nie opencloud-rolling, nie latest). init und opencloud stehen im selben Deployment und werden gemeinsam angehoben. Minor/Major nur nach Rezept OpenCloud Teil L.",
+      "matchPackageNames": ["docker.io/opencloudeu/opencloud"],
+      "allowedVersions": "/^\\d+\\.\\d+\\.\\d+$/"
+    },
+    {
+      "description": "Keycloak: nur X.Y.Z. Minor/Major migrieren das DB-Schema -> On-Demand-Backup vorher (Rezept OpenCloud Teil L).",
+      "matchPackageNames": ["quay.io/keycloak/keycloak"],
+      "allowedVersions": "/^\\d+\\.\\d+\\.\\d+$/"
+    },
+    {
+      "description": "Collabora CODE: mehrstellige numerische Tags, keine Varianten-Suffixe.",
+      "matchPackageNames": ["docker.io/collabora/code"],
+      "versioning": "loose",
+      "allowedVersions": "/^\\d+(\\.\\d+)+$/"
     }
   ]
 }

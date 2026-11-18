@@ -4,10 +4,20 @@ resources:
   - namespace.yaml
   - opencloud-secret.yaml
   - opencloud-smtp-secret.yaml
+  - collabora-proof-key-secret.yaml
   - keycloak/keycloak.yaml
+  - opencloud/pvc.yaml
+  - opencloud/deployment.yaml
+  - opencloud/service.yaml
+  - collabora.yaml
   - httproutes.yaml
 configMapGenerator:
   - name: keycloak-realm
     namespace: opencloud
     files:
       - openCloud-realm.json=keycloak/opencloud-realm.json   # Keycloak 26.8: Dateiname = Realm-Name
+  - name: opencloud-config-files
+    namespace: opencloud
+    files:
+      - opencloud/config/csp.yaml
+      - opencloud/config/banned-password-list.txt
