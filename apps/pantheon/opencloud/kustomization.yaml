@@ -6,9 +6,6 @@ resources:
   - opencloud-smtp-secret.yaml
   - collabora-proof-key-secret.yaml
   - keycloak/keycloak.yaml
-  - opencloud/pvc.yaml
-  - opencloud/deployment.yaml
-  - opencloud/service.yaml
   - collabora.yaml
   - httproutes.yaml
 configMapGenerator:
