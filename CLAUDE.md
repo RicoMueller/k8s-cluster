@@ -39,6 +39,7 @@ Sprache im Gespräch: **Deutsch**. Abkürzungen ausschreiben (z.B. „Pull Reque
 - Datenbanken deklarativ über CNPG-CRDs (`DatabaseRole`, `Database`) in `infrastructure/controllers/databases/pantheon-pg/`; in deren `kustomization.yaml` Secret und Rolle **vor** der Datenbank.
 - PodSecurity: `restricted`-konform, wo das Image es zulässt; sonst Namespace auf `baseline` mit Begründung im Kommentar.
 - Routing über `HTTPRoute` an `pantheon-gateway` (Namespace `default`).
+- Per `subPath` eingehängte ConfigMaps (z.B. Homepage) aktualisieren sich im laufenden Pod nie. Bei Änderungen an der ConfigMap die Annotation `pantheon.rm-it.org/config-revision` im Pod-Template anheben (Homepage: `apps/pantheon/homepage/deployment.yaml`), nie `kubectl rollout restart` (Flux entfernt dessen Annotation beim nächsten Reconcile und startet den Pod erneut).
 - **Keine `Job`-Objekte mit Renovate-erfassten Images** in Flux-Pfaden: `Job.spec.template` ist unveränderlich, ein Tag-Bump blockiert dann den Sync. Migrationen als initContainer.
 - Vor jedem Commit: `kubectl kustomize <verzeichnis> > /dev/null && echo BUILD_OK`; JSON mit `python3 -m json.tool` prüfen.
 
