@@ -119,7 +119,7 @@ data:
         - Keycloak:
             icon: keycloak.png
             href: https://keycloak-admin.rm-it.org/
-            description: Identitäten (OpenCloud)
+            description: Identitäten
             siteMonitor: http://keycloak.opencloud.svc.cluster.local:8080/realms/openCloud
     - Netzwerk:
         - FRITZ!Box:
