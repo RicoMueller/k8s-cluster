@@ -105,7 +105,7 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 
 | Block | Inhalt | Rico aktiv | Claude Code | HALTs | Wirkung im Cluster |
 |---|---|---|---|---|---|
-| 0 ✅ 16.11.2026 (0.6 offen) | Rezept ins Repo, Vorab-Checks, Upstream-Abgleich, Versionen; **0.6 Speicher freiräumen** | 5 Min (Eingaben) + 0.6: ~1 h aktiv, spätestens vor Block F | ~25 Min | 0 | keine (0.6: nur QNAP) |
+| 0 ✅ 16.11.2026 (0.6 ✅ 19.11.2026, Time-Machine-Probe offen) | Rezept ins Repo, Vorab-Checks, Upstream-Abgleich, Versionen; **0.6 Speicher freiräumen** | 5 Min (Eingaben) + 0.6: ~1 h aktiv, spätestens vor Block F | ~25 Min | 0 | keine (0.6: nur QNAP) |
 | A ✅ 16.11.2026 | Cloudflare-Token, alle Grund-Secrets inkl. SMTP | ~15 Min | Prüfung `ENC[` | — | keine |
 | B ✅ 16.11.2026 | Wildcard-Zertifikat, HTTPS-Listener am Gateway | — | ~30 Min | 0 | HTTPS im LAN für `*.rm-it.org` |
 | C ✅ 17.11.2026 | Keycloak-DB, Keycloak mit SMTP, Routen | ~15 Min | ~40 Min | 1 | Identität läuft (LAN), Keycloak sendet Mails |
@@ -593,7 +593,7 @@ git pull --rebase && git push
 | UrdaSot | Thick | 56 GB / 1014 GB | verschlüsselt auf die Storage Box archivieren, dann löschen | ≈ 1,0 TB |
 | PrivateCloud | Thin | 1,34 TB / 2,93 TB | **bleibt** bis Block J (HBS-3-Spiegel der Dropbox) | später ≈ 1,34 TB |
 
-Erwartet frei danach: **≈ 5,5 TB**. PrivateCloud kann als Thin-Volume bis zur Dropbox-Quote (2000 GB) noch ≈ 0,5 TB wachsen — auch dann bleibt genug.
+Erwartet frei danach: **≈ 5,5 TB** — *korrigiert ≈ 5,3 TB: Transfer lag in einem eigenen SSD-Pool und gibt in Pool 1 nichts frei (17.11.2026).* PrivateCloud kann als Thin-Volume bis zur Dropbox-Quote (2000 GB) noch ≈ 0,5 TB wachsen — auch dann bleibt genug.
 
 > PrivateCloud (1,34 TB) ist kleiner als der Dropbox-Bestand (1690 GB) — der HBS-3-Spiegel ist vermutlich unvollständig und **kein** Ersatz für die Migration über die Dropbox-API (Block F) oder deren Hash-Prüfung (Block G).
 
@@ -613,16 +613,40 @@ Erwartet frei danach: **≈ 5,5 TB**. PrivateCloud kann als Thin-Volume bis zur 
 > 3. Mac: Backup-Häufigkeit zurück auf *Automatisch stündlich*, dann **Backup jetzt erstellen** — muss ohne Fehler durchlaufen.
 > 4. Bietet QNAP das Verkleinern nicht an: **nicht** das Volume löschen. Meldung an Claude Code notieren; Ausweg wäre ein neues Thin-Volume mit 1,5 TB und eine frische Time-Machine-Sicherung (Versionsverlauf geht verloren) — das entscheidet Rico gesondert.
 >
-> **4. UrdaSot verschlüsselt archivieren, prüfen, dann löschen**
-> 1. **Hetzner-Konsole → Storage Box `u620152` → Sub-Accounts → Sub-Account erstellen:** Basisverzeichnis `urdasot-archiv`, **WebDAV-Support an**, externe Erreichbarkeit an, Kommentar „UrdaSot-Archiv". Passwort im Passwortmanager ablegen als **„Hetzner Storage Box – Sub-Account urdasot-archiv"**. Hetzner vergibt die Namen fortlaufend; Paperless hat `u620152-sub1`, dieser wird also voraussichtlich **`u620152-sub2`**. Den tatsächlichen Namen ins Ergebnisprotokoll 0.6 eintragen — Block H rechnet mit `u620152-sub3` für das OpenCloud-Backup.
-> 2. **QNAP → HBS 3 → Sichern → Erstellen → Neuer Sicherungsauftrag:** Quelle = Freigabeordner von *UrdaSot* (alles). Ziel = *Cloud-Speicher → WebDAV*, URL `https://` + Sub-Account-Name + `.your-storagebox.de`, Benutzer = Sub-Account-Name, Passwort aus Schritt 1, Zielordner `urdasot`. Auftragsname `UrdaSot-Archiv`.
-> 3. In den **Richtlinien** des Auftrags: **Clientseitige Verschlüsselung an**. Passwort im Passwortmanager ablegen als **„HBS 3 – Verschlüsselung UrdaSot-Archiv"** — ohne dieses Passwort ist das Archiv wertlos. Zeitplan: *Keiner* (einmaliger Lauf). Versionsverwaltung: Standard lassen.
-> 4. Auftrag **jetzt sichern** → warten bis *Abgeschlossen* (56 GB bei 40 Mbit/s Upload ≈ 3–4 h).
-> 5. **Wiederherstellung prüfen:** HBS 3 → *Wiederherstellen* → Auftrag aus dem Ziel `UrdaSot-Archiv` → 3–5 Dateien unterschiedlichen Typs (eine große, ein Dokument, ein Unterordner) in einen neuen Ordner `_restore-test` auf *Wolfstavar* zurückholen → öffnen, Inhalt prüfen → `_restore-test` löschen.
-> 6. Optional, für eine zweite Kopie: denselben Auftrag zusätzlich auf eine externe USB-Platte.
-> 7. Erst jetzt: *UrdaSot* markieren → **Verwalten → Entfernen**. Die 5 Snapshots des Volumes verschwinden dabei mit.
+> **4. UrdaSot verschlüsselt archivieren, prüfen, dann löschen** *(seit 1.2: rclone crypt vom Mac statt HBS 3 — HBS-3-WebDAV verbindet nicht mit Hetzner, obwohl `curl` PROPFIND `207` liefert)*
+> 1. **Hetzner-Konsole → Storage Box `u620152` → Sub-Accounts → Sub-Account erstellen:** Basisverzeichnis `urdasot-archiv`, **WebDAV-Support an**, externe Erreichbarkeit an, Kommentar „UrdaSot-Archiv". Passwort im Passwortmanager ablegen als **„Hetzner Storage Box – Sub-Account urdasot-archiv"**. Paperless hat `u620152-sub1`, dieser wurde **`u620152-sub2`** — Block H nutzt deshalb `u620152-sub3`. Zielordner `urdasot` im Sub-Account anlegen.
+> 2. **Mac:** `brew install rclone`, Freigabe *Urda Sot* im Finder verbinden (`/Volumes/Urda Sot`). Remotes in **einem eigenen Terminal** anlegen (Passwort und Salt mit `openssl rand -base64 32` erzeugen, das Sub-Account-Passwort per `read -s` einlesen, beide Werte nach der Ausgabe im Passwortmanager ablegen als **„rclone crypt UrdaSot-Archiv – Passwort"** und **„… – Salt"** — ohne beide ist das Archiv wertlos, auch für Hetzner):
+>    ```bash
+>    rclone config create urdasot-webdav webdav url=https://u620152-sub2.your-storagebox.de/urdasot \
+>      vendor=other user=u620152-sub2 pass="$DAV_PW" --obscure > /dev/null
+>    rclone config create urdasot-archiv crypt remote=urdasot-webdav: \
+>      password="$CRYPT_PW" password2="$CRYPT_SALT" --obscure > /dev/null
+>    ```
+> 3. **Kopieren** (neues Terminal, Netzteil dran, Deckel offen; `caffeinate -s` wirkt nur am Netzteil, Zuklappen schläft trotzdem). `ls -d` bricht ab, wenn die Freigabe nicht verbunden ist; der Lauf ist wiederaufsetzbar:
+>    ```bash
+>    ls -d "/Volumes/Urda Sot" && caffeinate -ims rclone copy "/Volumes/Urda Sot" "urdasot-archiv:Urda Sot" \
+>      --exclude ".DS_Store" \
+>      --transfers 2 --checkers 4 --bwlimit 3.5M \
+>      --retries 5 --low-level-retries 20 \
+>      --log-file "$HOME/urdasot-archiv-kopie.log" --log-level INFO -P
+>    ```
+>    Bis `Errors: 0` wiederholen. Dateien mit Namen über ≈ 143 Zeichen scheitern dauerhaft mit `403` (Stolperstein 35): einzeln mit gekürztem Namen per `rclone copyto` hochladen, daneben eine Textdatei `…_ORIGINALNAME.txt` mit dem Originalnamen.
+> 4. **Inhalt prüfen** — lädt alles zurück und vergleicht Byte für Byte (Dauer ≈ Upload):
+>    ```bash
+>    ls -d "/Volumes/Urda Sot" && caffeinate -ims rclone check "/Volumes/Urda Sot" "urdasot-archiv:Urda Sot" \
+>      --download --one-way --exclude ".DS_Store" --checkers 4 \
+>      --combined "$HOME/urdasot-archiv-check.txt" \
+>      --log-file "$HOME/urdasot-archiv-check.log" --log-level INFO -P
+>    ```
+>    Jede Zeile mit `*` in `urdasot-archiv-check.txt` einzeln nachprüfen (`md5 -q` an der Quelle zweimal, `rclone md5sum --download` am Archiv); falsche Archivkopien mit `rclone copyto --ignore-times` neu hochladen und erneut hashen (Stolperstein 36). Zusätzlich Dateianzahl beider Seiten mit `rclone lsf -R --files-only … | wc -l` vergleichen.
+> 5. Erst wenn alle Dateien belegt sind: Freigabe am Mac auswerfen, dann *UrdaSot* markieren → **Verwalten → Entfernen**. Die 5 Snapshots des Volumes verschwinden dabei mit.
+> 6. Remotes vom Mac entfernen (`rclone config delete urdasot-archiv`, `rclone config delete urdasot-webdav`) — **erst nachdem** Passwort und Salt nachweislich im Passwortmanager stehen.
 >
-> **Hinweis zur Langlebigkeit:** Das Archiv liegt im HBS-3-Format (QuDedup). Ohne QNAP lässt es sich mit dem *QuDedup Extract Tool* (macOS/Windows, von qnap.com) und dem Verschlüsselungspasswort entpacken.
+> **Hinweis zur Langlebigkeit:** Das Archiv ist ein gewöhnliches rclone-crypt-Archiv. Wiederherstellen von jedem Rechner mit rclone: beide Remotes wie in Schritt 2 mit denselben drei Geheimnissen anlegen, dann `rclone copy "urdasot-archiv:Urda Sot" ZIEL`.
+>
+> **⚠️ Stolperstein 35 — rclone crypt und lange Dateinamen.** Der verschlüsselte Name ist länger als der Klartext; ab ≈ 143 Zeichen überschreitet er die 255 Byte, die WebDAV bei Hetzner zulässt → dauerhaft `403 Forbidden`. Abhilfe einzeln wie in Schritt 3; für Block H (Backup von OpenCloud) gilt dieselbe Grenze — dort `filename_encoding = base32768` prüfen.
+>
+> **⚠️ Stolperstein 36 — stille Lesefehler über SMB im WLAN.** Beim Upload kam eine Datei (gleiche Größe) mit falschem Inhalt an, bei der Prüfung lieferte eine andere einmal falsche Daten. rclone crypt sichert jeden Block mit Poly1305 — ein Fehler auf der Storage Box wäre beim Entschlüsseln aufgefallen, die Daten waren also schon beim Lesen falsch. Darum vor jedem Löschen der Quelle `rclone check --download`, nie nur Größe/Anzahl.
 >
 > **5. Ergebnis ablesen:** Speicher & Snapshots → Übersicht → Speicherpool 1 → **Freier Speicher**.
 >
@@ -634,13 +658,13 @@ Claude Code trägt die Werte ins Ergebnisprotokoll 0.6 ein, setzt im Blockplan �
 
 | Prüfpunkt | Erwartung | Ist |
 |---|---|---|
-| Transfer gelöscht | ja | |
-| Abyss Of Hel | 100 GB | |
-| TimeMachine | 1,5 TB, Time-Machine-Sicherung danach ok | |
-| UrdaSot-Archiv auf der Storage Box | Sub-Account `u620152-sub2`, Auftrag abgeschlossen | |
-| Wiederherstellungsprobe UrdaSot | Dateien öffnen sich | |
-| UrdaSot gelöscht | ja | |
-| Freier Speicher nach 0.6 | ≥ 3,6 TB (erwartet ≈ 5,5 TB) | |
+| Transfer gelöscht | ja | ✅ 17.11.2026 — lag in einem eigenen SSD-Pool, kein Gewinn für Pool 1 |
+| Abyss Of Hel | 100 GB | ✅ 100 GB, Pool 1 danach 3,4 TB frei |
+| TimeMachine | 1,5 TB, Time-Machine-Sicherung danach ok | ✅ 1,5 TB, Pool 1 danach 4,4 TB frei; Sicherung: ⚠️ **offen** — 19.11.2026 `fsck` meldet Fehler im Sicherungsabbild (Status 8), Reparatur durch WLAN-Abbruch unterbrochen; Wiederholung durch Rico, Ergebnis als Nachtrag |
+| UrdaSot-Archiv auf der Storage Box | Sub-Account `u620152-sub2`, Auftrag abgeschlossen | ✅ `u620152-sub2`, rclone crypt vom Mac, fünf Läufe 17.–18.11.2026, letzter Lauf 32,1 GiB in 3 h 48 min, `Errors` 0; 6984 Dateien / 55,58 GiB |
+| Wiederherstellungsprobe UrdaSot | Dateien öffnen sich | ✅ `rclone check --download` 18./19.11.2026 (4 h 9 min): 6981 gleich, 2 abweichend → `Cyptopteres am Bach.mp4` Archiv korrekt (Lesefehler bei der Prüfung), `…20211228 - Drum.wav` Archiv falsch → neu hochgeladen, MD5 gleich; Datei mit 189-Zeichen-Namen gekürzt + `…_ORIGINALNAME.txt`, MD5 gleich |
+| UrdaSot gelöscht | ja | ✅ 19.11.2026; rclone-Remotes vom Mac entfernt, Zugangsdaten im Passwortmanager (Rico) |
+| Freier Speicher nach 0.6 | ≥ 3,6 TB (erwartet ≈ 5,5 TB, korrigiert ≈ 5,3 TB) | ✅ **5,3 TB** — Eingang Block F erfüllt |
 
 ---
 
@@ -2310,6 +2334,17 @@ kubectl logs -n opencloud job/mig-probe-1
 
 **STOPP**, wenn die Dropbox-Größe > 80 % von `__DATA_SIZE__` ist (PVC zu klein → bei `allowVolumeExpansion: true` PVC-Erweiterung als eigener Commit vorschlagen, sonst Rico entscheidet) oder `opencloud:` nicht erreichbar ist (Stolperstein 22).
 
+> **⏸ Offene Entscheidung (Rico, 19.11.2026): Vorbefüllung aus PrivateCloud?** Der HBS-3-Spiegel *PrivateCloud* auf der QNAP (1,34 TB) enthält einen Großteil des Dropbox-Bestands. Idee: zuerst per LAN aus PrivateCloud nach OpenCloud kopieren, danach über die Dropbox-API nur fehlende und geänderte Dateien holen — spart bis zu ≈ 1,3 TB Download (≈ 12–24 h Hintergrundlaufzeit). Ein Internet-Upload fällt in keiner Variante an.
+>
+> **Messung vor der Entscheidung (nur lesend, Claude Code):**
+> 1. Dateianzahl und Größe von PrivateCloud gegen die Bestandsaufnahme oben (Dropbox).
+> 2. Stichprobe von ≈ 100 Dateien aus verschiedenen Hauptordnern: Größe **und Änderungszeit** in PrivateCloud gleich Dropbox? (rclone erkennt das Delta über Größe + Änderungszeit; stimmen die Zeiten nicht, lädt Schritt ② trotzdem alles neu.)
+> 3. Anteil der Dropbox-Dateien, die in PrivateCloud fehlen oder abweichen (`rclone check --size-only` auf Ordnerebene).
+>
+> **Bewertung:** Änderungszeiten stimmen **und** > 1 TB deckungsgleich → Vorbefüllung als neuer Schritt F.4a (PrivateCloud **nur lesend** per NFS in einen Job einhängen, Kopie nach OpenCloud, danach F.5 als Delta mit `rclone sync`, damit in Dropbox gelöschte Altdateien nicht in OpenCloud bleiben). Sonst: direkter Weg wie geplant (Architekturentscheidung 6). In beiden Fällen prüft G.3 jede Datei gegen den Dropbox-Inhalts-Hash — die Herkunft einer Datei ändert den Nachweis nicht.
+>
+> **Fortsetzungssatz:** „Vorbefüllung ja" oder „direkter Weg".
+
 ## F.4 — Testkopie
 
 ```bash
@@ -2347,6 +2382,7 @@ Claude Code beendet den Block mit einer **Hochrechnung** aus der ersten Statisti
 |---|---|---|
 | Dropbox gesamt (Größe / Dateien) | ≈ `DROPBOX_GB` | |
 | Kontingent OpenCloud | unbegrenzt | |
+| PrivateCloud gegen Dropbox (deckungsgleich / mtime-Stichprobe) → Entscheidung Vorbefüllung | — | |
 | Testkopie: Umlaute, langer Name, 1 GB, mtime | ok | |
 | Übertragungsrate / Hochrechnung | — | |
 
@@ -3019,6 +3055,8 @@ Reihenfolge = empfohlene Priorität, jeweils mit dem Risiko bis dahin.
 - **Identität (Architekturentscheidung 3 neu):** Autoprovisioning ins eingebaute OpenCloud-Verzeichnis `idm` statt Keycloak + OpenLDAP. Grund: einziges Upstream-LDAP-Image `bitnamilegacy/openldap:2.6` seit 19.08.2025 ohne Updates. C.3.1 (OpenLDAP), LDAP-Passwort in A.2, LDAP-Prüfungen in C.4/C.6/E.1, LDAP-Export in H und `ldap-data` entfallen. Realm-Datei aus `opencloud-realm-autoprovisioning.dist.json` (Konten und Gruppen geleert, `opencloudGuest` als Default-Rolle). D.4 mit `PROXY_AUTOPROVISION_ACCOUNTS=true`, `sub` als Benutzerkennung, Rollen aus Claim `roles`, `OC_EXCLUDE_RUN_SERVICES=idp`. Neue Stolpersteine 27 (Konto erst nach erster Anmeldung) und 28 (Konten in zwei Systemen); Stolperstein 1 auf die Realm-Datei umgeschrieben; D.9 prüft die Benutzerliste (kein `admin`).
 - **WOPI (Architekturentscheidung 5):** `collaboration` als Dienst im OpenCloud-Prozess unter `https://cloud.rm-it.org/wopi` (wie Upstream). Hostname `wopi.rm-it.org`, WOPI-Container, Service und Route entfallen; Collabora `aliasgroup1` auf `cloud.rm-it.org`.
 - **0.6 Verlauf (17.11.2026):** Transfer lag in einem eigenen SSD-Pool (kein Gewinn für Pool 1); nach Abyss Of Hel (100 GB) und TimeMachine (1,5 TB) 4,4 TB frei → Eingang Block F erfüllt. UrdaSot-Archiv mit **rclone crypt vom Mac** statt HBS 3 (HBS-3-WebDAV verbindet nicht mit Hetzner, Zugangsdaten per `curl` bestätigt); Upload über 2,4-GHz-WLAN langsam und anfangs mit SMB-Timeouts → `--transfers 2 --checkers 4 --bwlimit 3.5M`.
+- **0.6 abgeschlossen (19.11.2026):** Schritt 4 auf den tatsächlichen rclone-Ablauf umgeschrieben (Remotes, Kopie, `rclone check --download`, Remotes entfernen, Wiederherstellung ohne QNAP). Neue Stolpersteine 35 (crypt-Namen > 255 Byte → `403`, eine Datei mit gekürztem Namen) und 36 (stille SMB-Lesefehler im WLAN, eine Archivdatei neu hochgeladen). Erwartung frei ≈ 5,3 TB statt 5,5 TB; Ist 5,3 TB.
+- **F.3 (19.11.2026):** offene Entscheidung „Vorbefüllung aus PrivateCloud" mit Messung (Anzahl/Größe, mtime-Stichprobe, Abweichungsanteil) und Bewertungsregel; Zeile im Ergebnisprotokoll Block F.
 - **Neu 0.6 (Rico):** Speicher im QNAP-Pool freiräumen (Transfer löschen, Abyss Of Hel und TimeMachine verkleinern, UrdaSot verschlüsselt auf die Storage Box archivieren und löschen). Teil 0 hatte 2,5 TB frei gegen 3,6 TB Bedarf gemessen. Block F prüft das als Eingang; das Archiv belegt voraussichtlich den Storage-Box-Sub-Account `u620152-sub2`, Block H nutzt deshalb `u620152-sub3`; Block J deaktiviert den HBS-3-Spiegel PrivateCloud und entfernt das Volume mit dem Konto-Löschen.
 - **Block C (17.11.2026):** Stolperstein 29 (Upstream-Realm enthält echte Schlüssel → `KeyProvider` löschen, Prüfung `[0,0,0]`, Gegenprobe C.4/5), Stolperstein 30 (Dateiname = Realm-Name, `configMapGenerator` mit Schlüssel `openCloud-realm.json`), Stolperstein 31 (Route `keycloak-master-lan` nur am HTTPS-Listener für die Admin-Konsole), `loginTheme` geleert; C.5 mit Konto `rico-admin` und Hinweis zu grauem *Test connection*.
 - **Block D (18.11.2026):** Neuinstallation auf **Production 9.1.1** (neue stable-Linie seit 17.11.2026, 7.2.0–7.2.5 im Update-Kanal kritisch; Architektur gegen den 9.1.1-Quelltext geprüft) per zwei Commits statt Upgrade mit Config-Patch; L.2a beschreibt den Patch-Weg für spätere Upgrades. Collabora: Rechte wie Helm-Chart-Default (kein `SYS_ADMIN`, `allowPrivilegeEscalation` nicht `false`), fester WOPI-Prüfschlüssel aus Secret `collabora-proof-key` (OpenCloud cached 12 h ohne Neuladen), `net.lok_allow.host`, `ssl.ssl_verification`. Pflicht-Abgleich: `IDM_CREATE_DEMO_USERS`, `FRONTEND_ARCHIVER_MAX_SIZE`, Liste gesperrter Link-Passwörter, `OC_DEFAULT_LANGUAGE=de`. D.4/D.5 im Rezept = tatsächliche Manifeste. Stolpersteine 32 (Admin-Passwort im Init-Log), 33 (Bind-Mount-Alarm akzeptiert), 34 (geerbte Rollen in Keycloak verborgen); Stolperstein 16 und „Bewusst zurückgestellt" Punkt 0 (Bezugsquelle ab April 2027). Renovate-Regeln für OpenCloud, Keycloak, Collabora.
