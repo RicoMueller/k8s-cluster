@@ -1,0 +1,43 @@
+# Migrationsskript für die suspendierten CronJobs migration-* (Rezept F.2).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opencloud-migration-script
+  namespace: opencloud
+data:
+  migrate.sh: |
+    #!/bin/sh
+    set -eu
+    # rclone schreibt beim Token-Refresh in die Config -> beschreibbare Kopie (Stolperstein 10)
+    cp /secret/rclone.conf /work/rclone.conf
+    export RCLONE_CONFIG=/work/rclone.conf HOME=/work
+    L="--tpslimit 12 --retries 10 --low-level-retries 20 --stats 10m --stats-one-line --stats-log-level NOTICE"
+    case "$MODE" in
+      probe)
+        rclone about dropbox: || true
+        rclone size dropbox: --fast-list --tpslimit 12
+        rclone lsd dropbox: --tpslimit 12
+        rclone about opencloud: || true
+        rclone lsd opencloud:
+        ;;
+      test)
+        rclone copy "dropbox:$TEST_DIR" "opencloud:$TEST_DIR" $L --log-level INFO
+        rclone lsl "opencloud:$TEST_DIR"
+        ;;
+      copy)
+        rclone copy dropbox: opencloud: --fast-list --transfers 4 --checkers 8 $L --log-level NOTICE
+        ;;
+      check)
+        # Dropbox-Hash gegen den lokalen PosixFS-Baum (lesend eingehängt), Stolperstein 12
+        rclone check dropbox: "$SPACE_PATH" --one-way --fast-list --tpslimit 12 \
+          --combined /work/combined.txt || true
+        echo "== Zusammenfassung =="
+        printf "gleich:      %s\n" "$(grep -c '^= ' /work/combined.txt || true)"
+        printf "fehlt:       %s\n" "$(grep -c '^- ' /work/combined.txt || true)"
+        printf "abweichend:  %s\n" "$(grep -c '^\* ' /work/combined.txt || true)"
+        printf "Fehler:      %s\n" "$(grep -c '^! ' /work/combined.txt || true)"
+        echo "== Abweichungen (max. 200) =="
+        grep -v '^= ' /work/combined.txt | head -200 || true
+        ;;
+      *) echo "unbekannter MODE=$MODE"; exit 2 ;;
+    esac

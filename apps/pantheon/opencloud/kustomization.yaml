@@ -11,6 +11,9 @@ resources:
   - opencloud/service.yaml
   - collabora.yaml
   - httproutes.yaml
+  - migration/opencloud-migration-secret.yaml
+  - migration/script.yaml
+  - migration/cronjobs.yaml
 configMapGenerator:
   - name: keycloak-realm
     namespace: opencloud

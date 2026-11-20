@@ -1,0 +1,267 @@
+# Vier suspendierte CronJobs (Rezept F.2): Auslösen mit
+#   kubectl create job -n opencloud --from=cronjob/<name> <jobname>
+# Kein Job-Objekt in Git (Job.spec.template ist unveränderlich, Renovate-Tag-Bumps blockierten sonst den Sync).
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: migration-probe
+  namespace: opencloud
+spec:
+  schedule: "0 4 1 1 *"              # ohne Bedeutung: suspendiert, nur per kubectl create job --from ausgelöst
+  suspend: true
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 1209600   # 14 Tage: Logs bleiben für die Auswertung lesbar
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              # renovate: datasource=docker depName=docker.io/rclone/rclone
+              image: docker.io/rclone/rclone:1.76.0
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "/script/migrate.sh"]
+              env:
+                - name: MODE
+                  value: probe
+                - name: TEST_DIR
+                  value: _opencloud-migrationstest
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: secret
+                  mountPath: /secret
+                  readOnly: true
+                - name: script
+                  mountPath: /script
+                  readOnly: true
+                - name: work
+                  mountPath: /work
+              resources:
+                requests:
+                  memory: 256Mi
+                  cpu: 100m
+                limits:
+                  memory: 2Gi
+          volumes:
+            - name: secret
+              secret:
+                secretName: opencloud-migration
+            - name: script
+              configMap:
+                name: opencloud-migration-script
+            - name: work
+              emptyDir: {}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: migration-test
+  namespace: opencloud
+spec:
+  schedule: "0 4 1 1 *"              # ohne Bedeutung: suspendiert, nur per kubectl create job --from ausgelöst
+  suspend: true
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 1209600   # 14 Tage: Logs bleiben für die Auswertung lesbar
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              # renovate: datasource=docker depName=docker.io/rclone/rclone
+              image: docker.io/rclone/rclone:1.76.0
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "/script/migrate.sh"]
+              env:
+                - name: MODE
+                  value: test
+                - name: TEST_DIR
+                  value: _opencloud-migrationstest
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: secret
+                  mountPath: /secret
+                  readOnly: true
+                - name: script
+                  mountPath: /script
+                  readOnly: true
+                - name: work
+                  mountPath: /work
+              resources:
+                requests:
+                  memory: 256Mi
+                  cpu: 100m
+                limits:
+                  memory: 2Gi
+          volumes:
+            - name: secret
+              secret:
+                secretName: opencloud-migration
+            - name: script
+              configMap:
+                name: opencloud-migration-script
+            - name: work
+              emptyDir: {}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: migration-copy
+  namespace: opencloud
+spec:
+  schedule: "0 4 1 1 *"              # ohne Bedeutung: suspendiert, nur per kubectl create job --from ausgelöst
+  suspend: true
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 1209600   # 14 Tage: Logs bleiben für die Auswertung lesbar
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              # renovate: datasource=docker depName=docker.io/rclone/rclone
+              image: docker.io/rclone/rclone:1.76.0
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "/script/migrate.sh"]
+              env:
+                - name: MODE
+                  value: copy
+                - name: TEST_DIR
+                  value: _opencloud-migrationstest
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: secret
+                  mountPath: /secret
+                  readOnly: true
+                - name: script
+                  mountPath: /script
+                  readOnly: true
+                - name: work
+                  mountPath: /work
+              resources:
+                requests:
+                  memory: 256Mi
+                  cpu: 100m
+                limits:
+                  memory: 2Gi
+          volumes:
+            - name: secret
+              secret:
+                secretName: opencloud-migration
+            - name: script
+              configMap:
+                name: opencloud-migration-script
+            - name: work
+              emptyDir: {}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: migration-check
+  namespace: opencloud
+spec:
+  schedule: "0 4 1 1 *"              # ohne Bedeutung: suspendiert, nur per kubectl create job --from ausgelöst
+  suspend: true
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 1209600   # 14 Tage: Logs bleiben für die Auswertung lesbar
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          affinity:                    # RWO-PVC: nur auf dem Node des OpenCloud-Pods einhängbar
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app: opencloud
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: rclone
+              # renovate: datasource=docker depName=docker.io/rclone/rclone
+              image: docker.io/rclone/rclone:1.76.0
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "/script/migrate.sh"]
+              env:
+                - name: MODE
+                  value: check
+                - name: TEST_DIR
+                  value: _opencloud-migrationstest
+                - name: SPACE_PATH
+                  value: /data/storage/users/users/2c5b753a-5737-47a7-98b3-be001286b788   # D.10 / UPSTREAM.md
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: secret
+                  mountPath: /secret
+                  readOnly: true
+                - name: script
+                  mountPath: /script
+                  readOnly: true
+                - name: work
+                  mountPath: /work
+                - name: data
+                  mountPath: /data
+                  readOnly: true
+              resources:
+                requests:
+                  memory: 256Mi
+                  cpu: 100m
+                limits:
+                  memory: 2Gi
+          volumes:
+            - name: secret
+              secret:
+                secretName: opencloud-migration
+            - name: script
+              configMap:
+                name: opencloud-migration-script
+            - name: work
+              emptyDir: {}
+            - name: data
+              persistentVolumeClaim:
+                claimName: opencloud-data
+                readOnly: true
