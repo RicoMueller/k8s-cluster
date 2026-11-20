@@ -19,6 +19,12 @@ spec:
         - path:
             type: PathPrefix
             value: /resources
+      filters:
+        - type: RequestHeaderModifier   # Tunnel -> HTTP-Listener: Envoy überschreibt X-Forwarded-Proto mit http
+          requestHeaderModifier:        # -> OpenCloud 308-Schleife, Keycloak-Cookies ohne Secure (Stolperstein 5).
+            set:                        # Außen erzwingt Cloudflare HTTPS ("Always Use HTTPS"), am HTTPS-Listener ohnehin https.
+              - name: X-Forwarded-Proto
+                value: https
       backendRefs:
         - name: keycloak
           port: 8080
@@ -80,6 +86,12 @@ spec:
   rules:
     - timeouts:
         request: "0s"                  # Gateway API: 0s = kein Timeout (große Downloads, lange WebDAV-Transfers)
+      filters:
+        - type: RequestHeaderModifier   # Tunnel -> HTTP-Listener: Envoy überschreibt X-Forwarded-Proto mit http
+          requestHeaderModifier:        # -> OpenCloud 308-Schleife, Keycloak-Cookies ohne Secure (Stolperstein 5).
+            set:                        # Außen erzwingt Cloudflare HTTPS ("Always Use HTTPS"), am HTTPS-Listener ohnehin https.
+              - name: X-Forwarded-Proto
+                value: https
       backendRefs:
         - name: opencloud
           port: 9200
