@@ -1,0 +1,30 @@
+# PrivateCloud (HBS-3-Spiegel von Dropbox/0_PRIVAT) nur lesend für die Vorbefüllung (Rezept F.3/F.4a).
+# ZWEIFACHE readOnly-Absicherung: mountOptions [ro] hier + readOnly:true am volumeMount (Muster paperless-test).
+# Nach Block J (PrivateCloud wird entfernt) zusammen mit migration-seed löschen.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: opencloud-privatecloud-seed-nfs
+spec:
+  capacity:
+    storage: 2Ti
+  accessModes: [ReadOnlyMany]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions: [nfsvers=4, hard, ro]
+  nfs:
+    server: 192.168.178.42
+    path: /PrivateCloud
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: privatecloud-seed-ro
+  namespace: opencloud
+spec:
+  accessModes: [ReadOnlyMany]
+  storageClassName: ""
+  volumeName: opencloud-privatecloud-seed-nfs
+  resources:
+    requests:
+      storage: 2Ti

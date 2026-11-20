@@ -12,6 +12,7 @@ resources:
   - collabora.yaml
   - httproutes.yaml
   - migration/opencloud-migration-secret.yaml
+  - migration/seed-nfs.yaml
   - migration/script.yaml
   - migration/cronjobs.yaml
 configMapGenerator:

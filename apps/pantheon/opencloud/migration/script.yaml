@@ -24,8 +24,16 @@ data:
         rclone copy "dropbox:$TEST_DIR" "opencloud:$TEST_DIR" $L --log-level INFO
         rclone lsl "opencloud:$TEST_DIR"
         ;;
+      seed)
+        # Vorbefüllung aus PrivateCloud (= Dropbox/0_PRIVAT, NFS nur lesend) über das LAN (F.4a)
+        rclone copy /seed opencloud:0_PRIVAT --transfers 4 --checkers 8 $L --log-level NOTICE \
+          --exclude "@Recycle/**" --exclude ".@__thumb/**" --exclude "@__thumb/**" --exclude ".DS_Store"
+        ;;
       copy)
-        rclone copy dropbox: opencloud: --fast-list --transfers 4 --checkers 8 $L --log-level NOTICE
+        # 0_PRIVAT per sync: in Dropbox gelöschte Altdateien aus der Vorbefüllung entfernen.
+        # Nur dieser Teilbaum — sync auf der Wurzel würde Testordner in OpenCloud löschen.
+        rclone sync dropbox:0_PRIVAT opencloud:0_PRIVAT --fast-list --transfers 4 --checkers 8 --max-delete 1000 $L --log-level NOTICE
+        rclone copy dropbox: opencloud: --exclude "/0_PRIVAT/**" --fast-list --transfers 4 --checkers 8 $L --log-level NOTICE
         ;;
       check)
         # Dropbox-Hash gegen den lokalen PosixFS-Baum (lesend eingehängt), Stolperstein 12

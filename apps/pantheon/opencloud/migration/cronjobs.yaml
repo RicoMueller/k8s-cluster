@@ -1,4 +1,4 @@
-# Vier suspendierte CronJobs (Rezept F.2): Auslösen mit
+# Fünf suspendierte CronJobs (Rezept F.2): Auslösen mit
 #   kubectl create job -n opencloud --from=cronjob/<name> <jobname>
 # Kein Job-Objekt in Git (Job.spec.template ist unveränderlich, Renovate-Tag-Bumps blockierten sonst den Sync).
 ---
@@ -187,6 +187,75 @@ spec:
                 name: opencloud-migration-script
             - name: work
               emptyDir: {}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: migration-seed
+  namespace: opencloud
+spec:
+  schedule: "0 4 1 1 *"              # ohne Bedeutung: suspendiert, nur per kubectl create job --from ausgelöst
+  suspend: true
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 1209600   # 14 Tage: Logs bleiben für die Auswertung lesbar
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              # renovate: datasource=docker depName=docker.io/rclone/rclone
+              image: docker.io/rclone/rclone:1.76.0
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "/script/migrate.sh"]
+              env:
+                - name: MODE
+                  value: seed
+                - name: TEST_DIR
+                  value: _opencloud-migrationstest
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: secret
+                  mountPath: /secret
+                  readOnly: true
+                - name: script
+                  mountPath: /script
+                  readOnly: true
+                - name: work
+                  mountPath: /work
+                - name: seed
+                  mountPath: /seed
+                  readOnly: true
+              resources:
+                requests:
+                  memory: 256Mi
+                  cpu: 100m
+                limits:
+                  memory: 2Gi
+          volumes:
+            - name: secret
+              secret:
+                secretName: opencloud-migration
+            - name: script
+              configMap:
+                name: opencloud-migration-script
+            - name: work
+              emptyDir: {}
+            - name: seed
+              persistentVolumeClaim:
+                claimName: privatecloud-seed-ro
+                readOnly: true
 ---
 apiVersion: batch/v1
 kind: CronJob
