@@ -143,9 +143,10 @@ spec:
             - name: OC_SHARING_PUBLIC_SHARE_MUST_HAVE_PASSWORD
               value: "true"              # Default, explizit: öffentliche Links nur mit Passwort
             # --- Mail-Benachrichtigungen über IONOS (Architekturentscheidung 8) ---
-            # Zusatzdienste: notifications (Mails) und collaboration (WOPI). Variablenname aus Teil 0.4 b.
+            # Zusatzdienste: notifications (Mails), collaboration (WOPI), auth-app (App-Tokens für die
+            # rclone-Migration, Block F; PROXY_ENABLE_APP_AUTH allein reicht nicht). Variablenname aus Teil 0.4 b.
             - name: OC_ADD_RUN_SERVICES
-              value: notifications,collaboration
+              value: notifications,collaboration,auth-app
             - name: NOTIFICATIONS_SMTP_HOST
               value: smtp.ionos.de
             - name: NOTIFICATIONS_SMTP_PORT
