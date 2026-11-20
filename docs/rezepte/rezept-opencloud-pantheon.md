@@ -110,7 +110,7 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 | B ✅ 16.11.2026 | Wildcard-Zertifikat, HTTPS-Listener am Gateway | — | ~30 Min | 0 | HTTPS im LAN für `*.rm-it.org` |
 | C ✅ 17.11.2026 | Keycloak-DB, Keycloak mit SMTP, Routen | ~15 Min | ~40 Min | 1 | Identität läuft (LAN), Keycloak sendet Mails |
 | D ✅ 18.11.2026 | OpenCloud mit Mail-Benachrichtigungen, WOPI, Collabora, Routen, Renovate | ~10 Min | ~40 Min | 1 | OpenCloud im LAN nutzbar |
-| E | Sicherheits-Gate, DNS-Routen, externe Prüfungen, Geräte | ~20 Min | ~20 Min | 2 | von außen + Apps |
+| E ✅ 20.11.2026 | Sicherheits-Gate, DNS-Routen, externe Prüfungen, Geräte | ~20 Min | ~20 Min | 2 | von außen + Apps |
 | F | Dropbox-Zugang, Testkopie, Vollkopie starten | ~20 Min | ~30 Min + Laufzeit (Tage) | 1 | Kopie läuft im Hintergrund |
 | G | Delta-Lauf, Hash-Prüfung, Bericht | — | ~30 Min | 0 | — |
 | H | Off-site-Ziel, QNAP-Snapshots, Backup-Job, Restore-Probe | ~20 Min | ~40 Min + Erstlauf (Tage) | 1 | Backup aktiv |
@@ -1211,6 +1211,12 @@ spec:
         - path:
             type: PathPrefix
             value: /resources
+      filters:
+        - type: RequestHeaderModifier   # Tunnel -> HTTP-Listener: Envoy überschreibt X-Forwarded-Proto mit http
+          requestHeaderModifier:        # -> OpenCloud 308-Schleife, Keycloak-Cookies ohne Secure (Stolperstein 5).
+            set:                        # Außen erzwingt Cloudflare HTTPS ("Always Use HTTPS"), am HTTPS-Listener ohnehin https.
+              - name: X-Forwarded-Proto
+                value: https
       backendRefs:
         - name: keycloak
           port: 8080
@@ -1852,6 +1858,12 @@ spec:
   rules:
     - timeouts:
         request: "0s"                  # Gateway API: 0s = kein Timeout (große Downloads, lange WebDAV-Transfers)
+      filters:
+        - type: RequestHeaderModifier   # Tunnel -> HTTP-Listener: Envoy überschreibt X-Forwarded-Proto mit http
+          requestHeaderModifier:        # -> OpenCloud 308-Schleife, Keycloak-Cookies ohne Secure (Stolperstein 5).
+            set:                        # Außen erzwingt Cloudflare HTTPS ("Always Use HTTPS"), am HTTPS-Listener ohnehin https.
+              - name: X-Forwarded-Proto
+                value: https
       backendRefs:
         - name: opencloud
           port: 9200
@@ -2054,6 +2066,8 @@ kubectl get deploy opencloud -n opencloud -o jsonpath='{.spec.template.spec.cont
 >
 > **Fortsetzungssatz:** „DNS-Routen angelegt, weiter mit E.3."
 
+> **Cloudflare-Dashboard → rm-it.org → SSL/TLS → Edge Certificates → „Always Use HTTPS": On** (seit 1.2; war aus — Keycloak-Login war von außen per `http://` unverschlüsselt erreichbar). Gilt für die ganze Zone.
+
 > **Keine Access-Application anlegen** (Architekturentscheidung 2). Existiert durch frühere Experimente eine Access-Application für einen dieser Hostnamen, blockiert sie die Apps — in der Ausgabe von E.3 an einer Weiterleitung zu `cloudflareaccess.com` erkennbar.
 
 ## E.3 — Externe Prüfungen über die Cloudflare-Kante
@@ -2072,15 +2086,23 @@ curl -s -o /dev/null -w "%{http_code}\n" $X https://keycloak.rm-it.org/realms/ma
 curl -s -o /dev/null -w "%{http_code}\n" $X https://keycloak.rm-it.org/admin/
 dig +short keycloak-admin.rm-it.org @1.1.1.1
 # Erwartung: 404; 404; leer
+
+# Seit 1.2: Cookies und HTTPS-Zwang (Stolperstein 5)
+curl -s -D - -o /dev/null $X "https://keycloak.rm-it.org/realms/openCloud/protocol/openid-connect/auth?client_id=web&response_type=code&scope=openid&redirect_uri=https%3A%2F%2Fcloud.rm-it.org%2Foidc-callback.html" \
+  | grep -i '^set-cookie' | grep -vc 'Secure'
+curl -s -o /dev/null -w "%{http_code}\n" --resolve cloud.rm-it.org:80:$CF http://cloud.rm-it.org/
+# Erwartung: 0 (alle Cookies mit Secure); 301
 ```
 
 > **⚠️ Stolperstein 5 — `http` im Issuer über den Tunnel.** `cloudflared` spricht das Gateway per HTTP an; überschreibt Envoy `X-Forwarded-Proto` mit `http`, könnte Keycloak Cookies ohne `Secure` setzen oder in Weiterleitungen `http` verwenden. `KC_HOSTNAME` mit vollständiger `https`-URL fängt das für Issuer und Links ab. Zeigt die Prüfung oben trotzdem `http://` oder schlägt der App-Login in E.4 mit einer Cookie-Meldung fehl → STOPP. Mögliche Abhilfe (Rico entscheidet): `cloudflared` auf `https://`-Origin mit `originServerName` umstellen — dann muss aber die Admin-Route anders geschützt werden, weil der Tunnel dann am HTTPS-Listener ankommt.
+>
+> **Eingetreten 20.11.2026 — und schärfer als erwartet:** Cilium betreibt das Gateway mit `gateway-api-use-remote-address=true` und `gateway-api-xff-num-trusted-hops=0`; Envoy überschreibt das `X-Forwarded-Proto: https` von `cloudflared` mit `http`. Folgen: **OpenCloud** antwortet darauf mit `308` auf `https://` → Endlosschleife, von außen nicht nutzbar (`status.php` kein JSON); **Keycloak** setzt Cookies ohne `Secure` (`SameSite=Lax`). Issuer und Formular-Action waren dank `KC_HOSTNAME` korrekt `https`. **Lösung (Rico, Commit `a6216f2`):** `RequestHeaderModifier` setzt `X-Forwarded-Proto: https` an den Routen `keycloak` und `opencloud` (C.3.4, D.6) — Envoy wendet den Routenfilter nach dem Überschreiben an. Collabora braucht ihn nicht (`ssl.termination`, `discovery` liefert `https`). Verworfen: Tunnel auf den HTTPS-Listener (öffnet `/realms/master` über `keycloak-master-lan`), Trusted Hops erhöhen (clusterweit, Wartungsfenster). Zusätzlich „Always Use HTTPS" in der Zone (E.2).
 
 ## E.4 — ⏸ HALT: Geräte-Test *(Rico, ~15 Min)*
 
 > **⏸ HALT [Rico]**
 > 1. **iPhone im Mobilfunk** (WLAN aus): OpenCloud-App installieren → Server `https://cloud.rm-it.org` → Login in Keycloak (Passwort + OTP) → Dateien sichtbar. Ein **Video > 150 MB** hochladen (testet TUS-Chunking unter Cloudflares 100-MB-Grenze).
-> 2. **Mac:** OpenCloud-Desktop installieren → Konto hinzufügen → **noch keinen Vollsync**: nur einen leeren Testordner synchronisieren, eine Datei hinein, im Browser kontrollieren.
+> 2. **Mac:** OpenCloud-Desktop installieren → Konto hinzufügen → **noch keinen Vollsync**: nur einen leeren Testordner synchronisieren, eine Datei hinein, im Browser kontrollieren. *(Desktop 4.0.0 auf macOS: der Assistent synchronisiert sofort den ganzen Space „Persönlich" vollständig — `virtualFilesMode=off`, keine Platzhalter. Direkt danach Einstellungen → Persönlich → ⋯ → **Ordner für Synchronisation auswählen** → nur den Testordner. Dateien direkt in der Wurzel des Space werden immer synchronisiert.)*
 > 3. **Öffentlicher Link:** im Browser einen Link auf eine Testdatei erzeugen (Passwort wird verlangt) → im Mobilfunk in einem privaten Fenster öffnen → Download klappt.
 > 4. Optional: in Keycloak unter *Sessions* sehen, dass Desktop und iPhone als eigene Clients angemeldet sind.
 >
@@ -2092,13 +2114,16 @@ dig +short keycloak-admin.rm-it.org @1.1.1.1
 
 | Prüfpunkt | Erwartung | Ist |
 |---|---|---|
-| Sicherheits-Gate 1–5 | grün | |
-| Issuer über Cloudflare | `https://…` | |
-| `/realms/master`, `/admin` extern | 404 / 404 | |
-| `keycloak-admin` öffentlich | keine DNS-Antwort | |
-| iPhone-Login + 150-MB-Upload | ok | |
-| Desktop-Testordner | ok | |
-| Öffentlicher Link mit Passwort | ok | |
+| Sicherheits-Gate 1–5 | grün | ✅ 20.11.2026: keine Registrierung; `false true`; Realm-Datei `[0,0,0]`, Konten `rico`/`testgast`; Tunnel-Pfad 404/404/404; Link-Passwort `true`. Zusatz: Collabora-Admin extern 403 |
+| DNS-Routen | `keycloak`, `cloud`, `collabora` | ✅ Cloudflare-Adressen (Rico, `cloudflared`); „Always Use HTTPS" eingeschaltet |
+| Issuer über Cloudflare | `https://…` | ✅ `https://keycloak.rm-it.org/realms/openCloud` |
+| `status.php` über Cloudflare | `installed true` | ⚠️→✅ zuerst 308-Schleife (Stolperstein 5), nach `a6216f2` `{"installed":true,"productversion":"9.1.1"}` |
+| Keycloak-Cookies extern | `Secure` | ⚠️→✅ zuerst ohne `Secure`, nach `a6216f2` `Secure; HttpOnly; SameSite=None` |
+| `/realms/master`, `/admin` extern | 404 / 404 | ✅ 404 / 404 (auch `/admin/master/console/`) |
+| `keycloak-admin` öffentlich | keine DNS-Antwort | ✅ leer |
+| iPhone-Login + 150-MB-Upload | ok | ✅ Login mit OTP; 206 MB über Cloudflare in 21 TUS-Stücken (40 s). Drei Versuche im Mobilfunk brachen ab (Uplink 2–13 Mbit/s, Abbruch vom Gerät, `context canceled`) — die iOS-App setzt nicht fort, sondern beginnt neu → große Dateien im WLAN hochladen |
+| Desktop-Testordner | ok | ✅ Desktop 4.0.0, `macOS test` per `MKCOL`, Testdatei hochgeladen; selektive Synchronisation eingestellt (siehe E.4) |
+| Öffentlicher Link mit Passwort | ok | ✅ extern zuerst `401`, nach Passwort Download `200` |
 
 ---
 
@@ -3057,6 +3082,7 @@ Reihenfolge = empfohlene Priorität, jeweils mit dem Risiko bis dahin.
 - **0.6 Verlauf (17.11.2026):** Transfer lag in einem eigenen SSD-Pool (kein Gewinn für Pool 1); nach Abyss Of Hel (100 GB) und TimeMachine (1,5 TB) 4,4 TB frei → Eingang Block F erfüllt. UrdaSot-Archiv mit **rclone crypt vom Mac** statt HBS 3 (HBS-3-WebDAV verbindet nicht mit Hetzner, Zugangsdaten per `curl` bestätigt); Upload über 2,4-GHz-WLAN langsam und anfangs mit SMB-Timeouts → `--transfers 2 --checkers 4 --bwlimit 3.5M`.
 - **0.6 abgeschlossen (19.11.2026):** Schritt 4 auf den tatsächlichen rclone-Ablauf umgeschrieben (Remotes, Kopie, `rclone check --download`, Remotes entfernen, Wiederherstellung ohne QNAP). Neue Stolpersteine 35 (crypt-Namen > 255 Byte → `403`, eine Datei mit gekürztem Namen) und 36 (stille SMB-Lesefehler im WLAN, eine Archivdatei neu hochgeladen). Erwartung frei ≈ 5,3 TB statt 5,5 TB; Ist 5,3 TB.
 - **0.6 Nachtrag Time Machine (20.11.2026):** Sicherungsabbild nach dem Verkleinern nicht reparierbar (`fsck` Status 8) → gelöscht und neu angelegt. QTS bietet kein `_adisk._tcp` an (Bonjour-Liste ohne Time Machine), daher Ziel per `sudo tmutil setdestination -p "smb://Ripley@Nostromo.local/TimeMachineBackup"`. Erstsicherung brach im 2,4-GHz-WLAN (SMB `error 35`) und beim Zuklappen ab; über 5 GHz mit offenem Deckel am Netzteil vollständig.
+- **Block E (20.11.2026):** Stolperstein 5 eingetreten (Envoy überschreibt `X-Forwarded-Proto` → OpenCloud-308-Schleife, Keycloak-Cookies ohne `Secure`) → `RequestHeaderModifier` an den Routen `keycloak` und `opencloud` (C.3.4, D.6 = Manifeste); „Always Use HTTPS" in der Cloudflare-Zone (E.2); E.3 prüft Cookies und HTTP→HTTPS. E.4: Desktop 4.0.0 synchronisiert unter macOS vollständig ohne Platzhalter → selektive Synchronisation direkt nach der Einrichtung; iOS-App beginnt abgebrochene Uploads neu.
 - **F.3 (19.11.2026):** offene Entscheidung „Vorbefüllung aus PrivateCloud" mit Messung (Anzahl/Größe, mtime-Stichprobe, Abweichungsanteil) und Bewertungsregel; Zeile im Ergebnisprotokoll Block F.
 - **Neu 0.6 (Rico):** Speicher im QNAP-Pool freiräumen (Transfer löschen, Abyss Of Hel und TimeMachine verkleinern, UrdaSot verschlüsselt auf die Storage Box archivieren und löschen). Teil 0 hatte 2,5 TB frei gegen 3,6 TB Bedarf gemessen. Block F prüft das als Eingang; das Archiv belegt voraussichtlich den Storage-Box-Sub-Account `u620152-sub2`, Block H nutzt deshalb `u620152-sub3`; Block J deaktiviert den HBS-3-Spiegel PrivateCloud und entfernt das Volume mit dem Konto-Löschen.
 - **Block C (17.11.2026):** Stolperstein 29 (Upstream-Realm enthält echte Schlüssel → `KeyProvider` löschen, Prüfung `[0,0,0]`, Gegenprobe C.4/5), Stolperstein 30 (Dateiname = Realm-Name, `configMapGenerator` mit Schlüssel `openCloud-realm.json`), Stolperstein 31 (Route `keycloak-master-lan` nur am HTTPS-Listener für die Admin-Konsole), `loginTheme` geleert; C.5 mit Konto `rico-admin` und Hinweis zu grauem *Test connection*.
