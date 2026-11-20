@@ -25,7 +25,7 @@ spec:
       containers:
         - name: collabora
           # renovate: datasource=docker depName=docker.io/collabora/code
-          image: docker.io/collabora/code:26.04.6.1.1
+          image: docker.io/collabora/code:26.04.6.2.1
           imagePullPolicy: IfNotPresent
           env:
             - name: aliasgroup1
