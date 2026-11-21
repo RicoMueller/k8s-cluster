@@ -81,6 +81,13 @@
       "matchPackageNames": ["docker.io/collabora/code"],
       "versioning": "loose",
       "allowedVersions": "/^\\d+(\\.\\d+)+$/"
+    },
+    {
+      "description": "PostgreSQL-Major (pantheon-pg): Renovate hebt nur den Tag im Katalogeintrag 'major: 18' an, cluster.yaml bleibt auf 18. CNPG prueft das Image nicht gegen den Eintrag, startet also neue Binaries auf altem PGDATA (PR #175, 21.11.2026). Ein Major ist ein Vorhaben fuers Wartungsfenster: neuer Katalogeintrag, major in cluster.yaml, pg_upgrade setzt System ID und Timeline zurueck -> neues Barman-Ziel. Daher nur nach Freigabe im Dependency Dashboard. Minor-Updates bleiben normale Pull Requests.",
+      "matchPackageNames": ["ghcr.io/cloudnative-pg/postgresql"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true,
+      "addLabels": ["postgres-major", "needs-upgrade-plan"]
     }
   ]
 }
