@@ -11,7 +11,13 @@ data:
     # rclone schreibt beim Token-Refresh in die Config -> beschreibbare Kopie (Stolperstein 10)
     cp /secret/rclone.conf /work/rclone.conf
     export RCLONE_CONFIG=/work/rclone.conf HOME=/work
-    L="--tpslimit 12 --retries 10 --low-level-retries 20 --stats 10m --stats-one-line --stats-log-level NOTICE"
+    # --timeout 1h: nach einem PUT von mehreren GB antwortet OpenCloud erst nach Minuten; bei 5 min (Default)
+    # brach rclone ab, wiederholte und füllte den Papierkorb mit Fassungen (F.4a, 22.11.2026).
+    L="--tpslimit 12 --retries 10 --low-level-retries 20 --timeout 1h --stats 10m --stats-one-line --stats-log-level NOTICE"
+    # Von Rico am 22.11.2026 zum Löschen bestimmt (Demo-VMs früherer Arbeitgeber, 865 GB, seit 2019 unverändert).
+    # Ausschluss als Absicherung, falls irgendwo noch ein Rest liegt. Pfade relativ zu 0_PRIVAT bzw. zur Wurzel.
+    X_PRIV="--exclude /05_ARBEITGEBER/Matrix42?AG/07_IT/Technical?Demos/EgoSecure?Demo/**"
+    X_ROOT="--exclude /0_PRIVAT/05_ARBEITGEBER/Matrix42?AG/07_IT/Technical?Demos/EgoSecure?Demo/**"
     case "$MODE" in
       probe)
         rclone about dropbox: || true
@@ -27,17 +33,17 @@ data:
       seed)
         # Vorbefüllung aus PrivateCloud (= Dropbox/0_PRIVAT, NFS nur lesend) über das LAN (F.4a)
         rclone copy /seed opencloud:0_PRIVAT --transfers 4 --checkers 8 $L --log-level NOTICE \
-          --exclude "@Recycle/**" --exclude ".@__thumb/**" --exclude "@__thumb/**" --exclude ".DS_Store"
+          --exclude "@Recycle/**" --exclude ".@__thumb/**" --exclude "@__thumb/**" --exclude ".DS_Store" $X_PRIV
         ;;
       copy)
         # 0_PRIVAT per sync: in Dropbox gelöschte Altdateien aus der Vorbefüllung entfernen.
         # Nur dieser Teilbaum — sync auf der Wurzel würde Testordner in OpenCloud löschen.
-        rclone sync dropbox:0_PRIVAT opencloud:0_PRIVAT --fast-list --transfers 4 --checkers 8 --max-delete 1000 $L --log-level NOTICE
+        rclone sync dropbox:0_PRIVAT opencloud:0_PRIVAT --fast-list --transfers 4 --checkers 8 --max-delete 1000 $X_PRIV $L --log-level NOTICE
         rclone copy dropbox: opencloud: --exclude "/0_PRIVAT/**" --fast-list --transfers 4 --checkers 8 $L --log-level NOTICE
         ;;
       check)
         # Dropbox-Hash gegen den lokalen PosixFS-Baum (lesend eingehängt), Stolperstein 12
-        rclone check dropbox: "$SPACE_PATH" --one-way --fast-list --tpslimit 12 \
+        rclone check dropbox: "$SPACE_PATH" --one-way --fast-list --tpslimit 12 $X_ROOT \
           --combined /work/combined.txt || true
         echo "== Zusammenfassung =="
         printf "gleich:      %s\n" "$(grep -c '^= ' /work/combined.txt || true)"
