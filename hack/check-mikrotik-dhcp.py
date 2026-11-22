@@ -72,8 +72,10 @@ SWITCHES = {
 
 # Portbelegung je Switch: Port -> (Bezeichnung, erwartete Geschwindigkeit oder None).
 # Quelle "Switching": Port_Mapping_Mikrotik_Switching.xlsx (Stand 22.11.2026),
-# Spalten Passiver Port Verkabelung (Dose) / Passiver Port Rack / Aktiver Port.
-# Ein hier eingetragener Port ohne Verbindung ist ein FEHLER (S6).
+# Spalten Passiver Port Verkabelung (Dose) / Passiver Port Rack / Aktiver Port;
+# am 22.11.2026 abends Arbeitsplatz von Dose 6 auf Dose 5 umgesteckt.
+# Ein hier eingetragener Port ohne Verbindung ist ein FEHLER (S6), ausser er
+# steht in KNOWN_DEFECTS.
 PORT_MAP = {
     "Switching": {
         "ether1": ("FritzBox (Gateway, DHCP) - Rack 4, blaues Kabel", None),
@@ -81,11 +83,22 @@ PORT_MAP = {
         "ether3": ("Netgear GS110EMX (Aggregation) - Rack 5, Dose 1", None),
         "ether4": ("Repeater Schlafzimmer - Rack 7, Dose 4", None),
         "ether5": ("Philips Hue Bridge - Rack 8, gruenes Kabel", "100M"),
-        "ether6": ("Arbeitsplatz (Mini-Switch? MacBook) - Rack 10, Dose 6", None),
+        "ether6": ("Dose 6, frueher Arbeitsplatz - Rack 10", None),
         "ether7": ("NAS - Rack 9, gruenes Kabel", "1G"),
-        "ether8": ("Mac - Rack 11, Dose 5", "1G"),
+        "ether8": ("Arbeitsplatz MacBook (UGREEN-Dock) - Rack 11, Dose 5", "1G"),
     },
     "Kubernetes": {},
+}
+
+# Bekannte, noch nicht reparierte Defekte: Port -> Hinweis. Diese Ports melden in
+# S6 nur WARN statt FEHLER und in S7 nur INFO, damit neue Fehler auffallen.
+# Nach der Reparatur den Eintrag entfernen (S6 meldet, sobald der Port wieder Link hat).
+KNOWN_DEFECTS = {
+    "Switching": {
+        "ether6": "Leitung Dose 6 -> Rack 10 defekt seit 12.11.2026 (pendelte 2.5G/100M, "
+                  "dann kein Link); Patchkabel Rack 10 -> ether6 tauschen, sonst Dose mit "
+                  "Kabeltester pruefen",
+    },
 }
 
 # Geraete, deren Port in der MAC-Tabelle gesucht wird (S8).
@@ -339,6 +352,7 @@ def check_switch(name, host, user, password, seen_macs):
     log = api.items("log") or []
     links = link_events(log)
     pmap = PORT_MAP.get(name, {})
+    defects = KNOWN_DEFECTS.get(name, {})
 
     # S6 Ports
     for p in active_ports:
@@ -355,12 +369,18 @@ def check_switch(name, host, user, password, seen_macs):
         if not is_true(i.get("running")):
             ev = links.get(pname)
             since = f", letzter Link down {ev['last_time']}" if ev and ev["last_state"] == "down" else ""
-            if pname in pmap:
+            if pname in defects:
+                rep.add(WARN, "S6", f"{port_label(name, pname)}: keine Verbindung{since} "
+                                    f"(bekannter Defekt: {defects[pname]})")
+            elif pname in pmap:
                 rep.add(ERR, "S6", f"{port_label(name, pname)}: KEINE VERBINDUNG{since} "
                                    "-> Geraet, Kabel, Dose oder Patchkabel pruefen")
             else:
                 free.append(pname + since)
             continue
+        if pname in defects:
+            rep.add(INFO, "S6", f"{port_label(name, pname)}: als defekt markiert, hat aber Verbindung "
+                                "-> nach Reparatur Eintrag in KNOWN_DEFECTS entfernen")
         expected = pmap.get(pname, (None, None))[1]
         current = links.get(pname, {}).get("last_speed")
         if expected and current and SPEED_MBIT.get(current, 0) < SPEED_MBIT.get(expected, 0):
@@ -386,16 +406,20 @@ def check_switch(name, host, user, password, seen_macs):
         # Neustart der Gegenstelle) bleibt unauffaellig.
         cats = [SPEED_MBIT.get(sp, 0) >= 1000 for sp in ev["speeds"]]
         swings = sum(1 for a, b in zip(cats, cats[1:]) if a != b)
+        known = port in defects
+        level = INFO if known else WARN
+        suffix = " (bekannter Defekt)" if known else ""
         if "100M" in speeds and fast and swings >= 3:
-            link_issue = True
-            rep.add(WARN, "S7", f"{port_label(name, port)}: pendelt {swings}x zwischen {'/'.join(fast)} und 100M "
-                                f"({span}) -> Hinweis auf defektes Adernpaar (Kabel, Dose, Patchkabel)")
+            link_issue = link_issue or not known
+            rep.add(level, "S7", f"{port_label(name, port)}: pendelt {swings}x zwischen {'/'.join(fast)} und 100M "
+                                f"({span}) -> Hinweis auf defektes Adernpaar (Kabel, Dose, Patchkabel){suffix}")
         if ev["downs"] >= LINK_DOWN_WARN:
-            link_issue = True
+            link_issue = link_issue or not known
             state = f", aktuell {ev['last_state']}" + (f" mit {ev['last_speed']}" if ev["last_state"] == "up" else "")
-            rep.add(WARN, "S7", f"{port_label(name, port)}: {ev['downs']} Link-Abbrueche im Log ({span}{state})")
+            rep.add(level, "S7", f"{port_label(name, port)}: {ev['downs']} Link-Abbrueche im Log ({span}{state}){suffix}")
     if not link_issue:
-        rep.add(OK, "S7", "keine auffaelligen Link-Ereignisse im Log")
+        rep.add(OK, "S7", "keine neuen auffaelligen Link-Ereignisse im Log" if defects else
+                          "keine auffaelligen Link-Ereignisse im Log")
 
     # S7 Log: sonstige relevante Eintraege
     hits = []
