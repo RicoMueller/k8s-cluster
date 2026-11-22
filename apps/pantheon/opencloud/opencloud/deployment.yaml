@@ -64,11 +64,6 @@ spec:
               value: https://cloud.rm-it.org
             - name: OC_LOG_LEVEL
               value: info
-            # VORÜBERGEHEND (22.11.2026, F.4a): Upload-Sitzungen und Papierkorb lassen sich nicht aufräumen
-            # (uploads sessions --clean / trash-bin purge-expired ohne Wirkung, Löschen im Browser hängt).
-            # Nach der Diagnose wieder entfernen.
-            - name: STORAGE_USERS_LOG_LEVEL
-              value: debug
             - name: OC_INSECURE
               value: "false"             # gültige Zertifikate auf allen Hostnamen (Block B)
             - name: PROXY_TLS
