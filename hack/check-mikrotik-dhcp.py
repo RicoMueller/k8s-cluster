@@ -3,12 +3,14 @@
 # die DHCP im Heimnetz blockieren koennen. Fragt dafuer die REST-Schnittstelle
 # der Weboberflaeche ab (http://<switch>/rest/...). Aendert nichts.
 #
-# Anlass: 14.-18.11.2026 bekam das MacBook ueber den Switch "Switching" per LAN
+# Anlass: 13.-22.11.2026 bekam das MacBook ueber den Switch "Switching" per LAN
 # keine Adresse mehr (nur 169.254.x.x). tcpdump am Mac zeigte DHCP-Anfragen,
-# aber keine Antwort der Fritzbox. Dock, Adapter und Mac waren unauffaellig;
-# das Steam Deck hatte zeitgleich dasselbe Problem. Dieses Skript gehoert
-# deshalb in jedes Wartungsfenster (Checkliste), damit der Fehler regelhaft
-# mitgeprueft wird.
+# aber keine Antwort der Fritzbox; das Steam Deck hatte dasselbe Problem.
+# Ursache (22.11.2026): Port ether6 (Arbeitsplatz) hatte vom 09.11. an alle
+# ~15 Minuten Link-Abbrueche mit Wechsel zwischen 2.5G/1G und 100M (Hinweis
+# auf ein defektes Adernpaar) und ist seit 12.11. 20:44 ganz ohne Link. Die
+# Konfiguration des Switches war unauffaellig. S6 und S7 erkennen genau das.
+# Das Skript gehoert in jedes Wartungsfenster (Checkliste).
 #
 # Pruefungen je Switch:
 #   S1  Erreichbarkeit, Identity, RouterOS-Version, Laufzeit
@@ -17,8 +19,11 @@
 #   S3  VLAN: PVID der Ports und Mitgliedschaft als untagged (bei vlan-filtering)
 #   S4  Bridge-Filter, Switch-Regeln, IP-Firewall auf der Bridge (DHCP Port 67/68)
 #   S5  DHCP-Server auf dem Switch (zweiter DHCP-Server im Netz)
-#   S6  Ports: horizon, Fehlerzaehler, Link-Abbrueche
-#   S7  Log: Schleifen, STP, DHCP, Link down
+#   S6  Ports: belegte Ports ohne Verbindung (laut Portbelegung), Geschwindigkeit
+#       unter Erwartung, horizon, Fehlerzaehler, Link-Abbrueche seit Start
+#   S7  Log: Link-Ereignisse je Port (Abbrueche, Wechsel der Geschwindigkeit,
+#       Herunterschalten auf 100M), Schleifen, STP, DHCP. RouterOS haelt nur die
+#       letzten ~1000 Log-Zeilen im Speicher; aeltere Ereignisse fehlen.
 #   S8  MAC-Tabelle: auf welchem Port die bekannten Geraete gelernt sind
 #
 # Voraussetzung (einmalig je Switch, macht Rico):
@@ -65,6 +70,24 @@ SWITCHES = {
     "Kubernetes": "192.168.178.171",
 }
 
+# Portbelegung je Switch: Port -> (Bezeichnung, erwartete Geschwindigkeit oder None).
+# Quelle "Switching": Port_Mapping_Mikrotik_Switching.xlsx (Stand 22.11.2026),
+# Spalten Passiver Port Verkabelung (Dose) / Passiver Port Rack / Aktiver Port.
+# Ein hier eingetragener Port ohne Verbindung ist ein FEHLER (S6).
+PORT_MAP = {
+    "Switching": {
+        "ether1": ("FritzBox (Gateway, DHCP) - Rack 4, blaues Kabel", None),
+        "ether2": ("Proxmox-Host - Rack 6, Dose 8", None),
+        "ether3": ("Netgear GS110EMX (Aggregation) - Rack 5, Dose 1", None),
+        "ether4": ("Repeater Schlafzimmer - Rack 7, Dose 4", None),
+        "ether5": ("Philips Hue Bridge - Rack 8, gruenes Kabel", "100M"),
+        "ether6": ("Arbeitsplatz (Mini-Switch? MacBook) - Rack 10, Dose 6", None),
+        "ether7": ("NAS - Rack 9, gruenes Kabel", "1G"),
+        "ether8": ("Mac - Rack 11, Dose 5", "1G"),
+    },
+    "Kubernetes": {},
+}
+
 # Geraete, deren Port in der MAC-Tabelle gesucht wird (S8).
 KNOWN_MACS = {
     "00:E0:4C:CC:21:34": "UGREEN-Dock U715 (MacBook)",
@@ -73,7 +96,10 @@ KNOWN_MACS = {
 KEYCHAIN_SERVICE = "pantheon-mikrotik-check"
 TIMEOUT_S = 10
 LINK_DOWN_WARN = 5
-LOG_PATTERN = re.compile(r"loop|stp|topology|dhcp|link down|flap|storm", re.IGNORECASE)
+LOG_TOPICS = {"dhcp", "stp", "bridge", "warning", "error", "critical"}
+LOG_MESSAGE = re.compile(r"loop|topology|storm|flap", re.IGNORECASE)
+LINK_EVENT = re.compile(r"^(?P<port>\S+) link (?P<state>up|down)(?: \(speed (?P<speed>[^,)]+))?")
+SPEED_MBIT = {"10M": 10, "100M": 100, "1G": 1000, "2.5G": 2500, "5G": 5000, "10G": 10000}
 DHCP_PORTS = {"67", "68"}
 
 OK, INFO, WARN, ERR = "OK", "INFO", "WARN", "FEHLER"
@@ -126,6 +152,29 @@ def ports_hit_dhcp(value):
         elif part in DHCP_PORTS:
             return True
     return False
+
+
+def port_label(switch, port):
+    entry = PORT_MAP.get(switch, {}).get(port)
+    return f"{port} ({entry[0]})" if entry else str(port)
+
+
+def link_events(log):
+    """Link-Ereignisse aus dem Log je Port zusammenfassen."""
+    ports = {}
+    for e in log:
+        m = LINK_EVENT.match(str(e.get("message", "")))
+        if not m:
+            continue
+        st = ports.setdefault(m["port"], {"downs": 0, "speeds": [], "first": e.get("time", ""),
+                                          "last_state": None, "last_time": None, "last_speed": None})
+        st["last_state"], st["last_time"] = m["state"], e.get("time", "")
+        if m["state"] == "down":
+            st["downs"] += 1
+        elif m["speed"]:
+            st["speeds"].append(m["speed"])
+            st["last_speed"] = m["speed"]
+    return ports
 
 
 def password_for(user):
@@ -286,32 +335,81 @@ def check_switch(name, host, user, password, seen_macs):
     else:
         rep.add(OK, "S5", "kein DHCP-Server auf dem Switch")
 
+    # Log einmal holen; S6 nutzt die Link-Ereignisse fuer "seit wann", S7 wertet aus.
+    log = api.items("log") or []
+    links = link_events(log)
+    pmap = PORT_MAP.get(name, {})
+
     # S6 Ports
     for p in active_ports:
         if p.get("horizon") not in (None, "", "none"):
-            rep.add(WARN, "S6", f"Port {p.get('interface')}: horizon={p.get('horizon')} "
+            rep.add(WARN, "S6", f"{port_label(name, p.get('interface'))}: horizon={p.get('horizon')} "
                                 "(kein Verkehr zu Ports mit gleichem horizon)")
-    problems = []
+    problems, free = [], []
     for i in api.items("interface") or []:
-        if i.get("type") not in ("ether", "sfp-sfpplus") and not str(i.get("name", "")).startswith(("ether", "sfp")):
+        pname = str(i.get("name", ""))
+        if i.get("type") not in ("ether", "sfp-sfpplus") and not pname.startswith(("ether", "sfp")):
+            continue
+        if is_true(i.get("disabled")):
             continue
         if not is_true(i.get("running")):
+            ev = links.get(pname)
+            since = f", letzter Link down {ev['last_time']}" if ev and ev["last_state"] == "down" else ""
+            if pname in pmap:
+                rep.add(ERR, "S6", f"{port_label(name, pname)}: KEINE VERBINDUNG{since} "
+                                   "-> Geraet, Kabel, Dose oder Patchkabel pruefen")
+            else:
+                free.append(pname + since)
             continue
+        expected = pmap.get(pname, (None, None))[1]
+        current = links.get(pname, {}).get("last_speed")
+        if expected and current and SPEED_MBIT.get(current, 0) < SPEED_MBIT.get(expected, 0):
+            rep.add(WARN, "S6", f"{port_label(name, pname)}: laeuft mit {current}, erwartet {expected}")
         errs = sum(int(i.get(k, 0) or 0) for k in ("rx-error", "tx-error"))
         downs = int(i.get("link-downs", 0) or 0)
         if errs or downs >= LINK_DOWN_WARN:
-            problems.append(f"{i.get('name')}: Fehler {errs}, Link-Abbrueche {downs}")
+            problems.append(f"{port_label(name, pname)}: Fehler {errs}, Link-Abbrueche {downs}")
+    if free:
+        rep.add(INFO, "S6", "ohne Verbindung, nicht in der Portbelegung: " + ", ".join(free))
     if problems:
         rep.add(WARN, "S6", "Ports mit Auffaelligkeiten seit Start: " + "; ".join(problems))
-    else:
-        rep.add(OK, "S6", "keine Port-Fehler, keine gehaeuften Link-Abbrueche")
+    elif not any(lvl == ERR and chk == "S6" for lvl, chk, _ in rep.lines):
+        rep.add(OK, "S6", "alle belegten Ports verbunden, keine Port-Fehler, keine gehaeuften Link-Abbrueche")
 
-    # S7 Log
-    hits = [e for e in api.items("log") or []
-            if LOG_PATTERN.search(f"{e.get('topics', '')} {e.get('message', '')}")]
-    if any("loop" in f"{e.get('topics', '')} {e.get('message', '')}".lower() for e in hits):
+    # S7 Log: Link-Ereignisse je Port
+    link_issue = False
+    for port, ev in sorted(links.items()):
+        speeds = set(ev["speeds"])
+        fast = sorted((sp for sp in speeds if SPEED_MBIT.get(sp, 0) >= 1000), key=lambda x: SPEED_MBIT[x])
+        span = f"{ev['first']} bis {ev['last_time']}"
+        # Mehrfaches Pendeln zwischen >=1G und 100M; ein einzelner Wechsel (z. B. beim
+        # Neustart der Gegenstelle) bleibt unauffaellig.
+        cats = [SPEED_MBIT.get(sp, 0) >= 1000 for sp in ev["speeds"]]
+        swings = sum(1 for a, b in zip(cats, cats[1:]) if a != b)
+        if "100M" in speeds and fast and swings >= 3:
+            link_issue = True
+            rep.add(WARN, "S7", f"{port_label(name, port)}: pendelt {swings}x zwischen {'/'.join(fast)} und 100M "
+                                f"({span}) -> Hinweis auf defektes Adernpaar (Kabel, Dose, Patchkabel)")
+        if ev["downs"] >= LINK_DOWN_WARN:
+            link_issue = True
+            state = f", aktuell {ev['last_state']}" + (f" mit {ev['last_speed']}" if ev["last_state"] == "up" else "")
+            rep.add(WARN, "S7", f"{port_label(name, port)}: {ev['downs']} Link-Abbrueche im Log ({span}{state})")
+    if not link_issue:
+        rep.add(OK, "S7", "keine auffaelligen Link-Ereignisse im Log")
+
+    # S7 Log: sonstige relevante Eintraege
+    hits = []
+    for e in log:
+        topics = set(str(e.get("topics", "")).split(","))
+        msg = str(e.get("message", ""))
+        if LINK_EVENT.match(msg):
+            continue
+        if topics & LOG_TOPICS or LOG_MESSAGE.search(msg):
+            hits.append(e)
+    if any("loop" in str(e.get("message", "")).lower() for e in hits):
         rep.add(WARN, "S7", "Log meldet eine Schleife (loop)")
-    rep.add(INFO if hits else OK, "S7", f"{len(hits)} relevante Log-Eintraege" + (", die letzten:" if hits else ""))
+    rep.add(INFO if hits else OK, "S7", f"{len(hits)} weitere relevante Log-Eintraege (DHCP, STP, Bridge, Warnungen)"
+                                        + (", die letzten:" if hits else ""))
     for e in hits[-10:]:
         print(f"           {e.get('time', '')}  {e.get('topics', '')}  {e.get('message', '')}")
 
@@ -321,7 +419,7 @@ def check_switch(name, host, user, password, seen_macs):
         if mac in KNOWN_MACS:
             port = h.get("on-interface") or h.get("interface") or "?"
             seen_macs.setdefault(mac, []).append(f"{name}:{port}")
-            rep.add(INFO, "S8", f"{KNOWN_MACS[mac]} ({mac}) gelernt an Port {port}")
+            rep.add(INFO, "S8", f"{KNOWN_MACS[mac]} ({mac}) gelernt an Port {port_label(name, port)}")
     return rep
 
 
