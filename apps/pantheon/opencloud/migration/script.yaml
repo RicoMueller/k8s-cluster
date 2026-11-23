@@ -47,9 +47,14 @@ data:
         rclone copy dropbox: opencloud: --fast-list --transfers 4 --checkers 8 $X_ROOT $L --log-level NOTICE
         ;;
       check)
-        # Dropbox-Hash gegen den lokalen PosixFS-Baum (lesend eingehängt), Stolperstein 12
-        rclone check dropbox: "$SPACE_PATH" --one-way --fast-list --tpslimit 12 $X_ROOT \
-          --combined /work/combined.txt || true
+        # Stolperstein 12: kein gemeinsamer Hash zwischen Dropbox und WebDAV. Das OpenCloud-Volume lässt
+        # sich nicht zusätzlich einhängen (Trident/iSCSI: "already mounted", 23.11.2026). Deshalb:
+        # Dropbox-Hashes aus der API holen, dann jede Datei über WebDAV lesen und den Hash selbst berechnen.
+        rclone hashsum dropbox dropbox: --fast-list --tpslimit 12 $X_ROOT --output-file /work/dropbox.sum
+        echo "Dropbox-Hashes: $(wc -l < /work/dropbox.sum)"
+        rclone checksum dropbox /work/dropbox.sum opencloud: --download --one-way --checkers 8 $X_ROOT \
+          --low-level-retries 20 --timeout 1h --stats 10m --stats-one-line --stats-log-level NOTICE \
+          --log-level NOTICE --combined /work/combined.txt || true   # ohne --tpslimit: Dropbox ist hier nicht beteiligt
         echo "== Zusammenfassung =="
         printf "gleich:      %s\n" "$(grep -c '^= ' /work/combined.txt || true)"
         printf "fehlt:       %s\n" "$(grep -c '^- ' /work/combined.txt || true)"
