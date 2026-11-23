@@ -34,7 +34,9 @@ data:
         # Vorbefüllung aus PrivateCloud (= Dropbox/0_PRIVAT, NFS nur lesend) über das LAN (F.4a)
         # .streams = QNAP-Ablage für macOS-Dateiattribute aus SMB, .smbdelete* = SMB-Löschreste,
         # ~$* = Office-Sperrdateien; ohne diese Ausschlüsse wollte F.5 rund 3.450 Dateien löschen (23.11.2026).
-        rclone copy /seed opencloud:0_PRIVAT --transfers 4 --checkers 8 $L --log-level NOTICE \
+        # --ignore-existing: nur Fehlendes nachlegen, nie neuere Dropbox-Fassungen überschreiben.
+        # INFO: jede kopierte Datei steht mit Namen im Log (Wiederherstellung nach Löschung, 23.11.2026).
+        rclone copy /seed opencloud:0_PRIVAT --ignore-existing --transfers 4 --checkers 8 $L --log-level INFO \
           --exclude "@Recycle/**" --exclude ".@__thumb/**" --exclude "@__thumb/**" --exclude ".DS_Store" \
           --exclude ".streams/**" --exclude ".smbdelete*" --exclude "~\$*" $X_PRIV
         ;;
