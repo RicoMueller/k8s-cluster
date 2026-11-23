@@ -32,14 +32,17 @@ data:
         ;;
       seed)
         # Vorbefüllung aus PrivateCloud (= Dropbox/0_PRIVAT, NFS nur lesend) über das LAN (F.4a)
+        # .streams = QNAP-Ablage für macOS-Dateiattribute aus SMB, .smbdelete* = SMB-Löschreste,
+        # ~$* = Office-Sperrdateien; ohne diese Ausschlüsse wollte F.5 rund 3.450 Dateien löschen (23.11.2026).
         rclone copy /seed opencloud:0_PRIVAT --transfers 4 --checkers 8 $L --log-level NOTICE \
-          --exclude "@Recycle/**" --exclude ".@__thumb/**" --exclude "@__thumb/**" --exclude ".DS_Store" $X_PRIV
+          --exclude "@Recycle/**" --exclude ".@__thumb/**" --exclude "@__thumb/**" --exclude ".DS_Store" \
+          --exclude ".streams/**" --exclude ".smbdelete*" --exclude "~\$*" $X_PRIV
         ;;
       copy)
-        # 0_PRIVAT per sync: in Dropbox gelöschte Altdateien aus der Vorbefüllung entfernen.
-        # Nur dieser Teilbaum — sync auf der Wurzel würde Testordner in OpenCloud löschen.
-        rclone sync dropbox:0_PRIVAT opencloud:0_PRIVAT --fast-list --transfers 4 --checkers 8 --max-delete 1000 $X_PRIV $L --log-level NOTICE
-        rclone copy dropbox: opencloud: --exclude "/0_PRIVAT/**" --fast-list --transfers 4 --checkers 8 $L --log-level NOTICE
+        # Nur copy, kein sync: Der sync auf 0_PRIVAT (mig-copy-1, 23.11.2026) wollte außer QNAP-Müll nur
+        # Dokumente löschen, die allein auf PrivateCloud lagen (TUSKA). copy löscht nie; überschriebene
+        # Fassungen landen im OpenCloud-Papierkorb.
+        rclone copy dropbox: opencloud: --fast-list --transfers 4 --checkers 8 $X_ROOT $L --log-level NOTICE
         ;;
       check)
         # Dropbox-Hash gegen den lokalen PosixFS-Baum (lesend eingehängt), Stolperstein 12
