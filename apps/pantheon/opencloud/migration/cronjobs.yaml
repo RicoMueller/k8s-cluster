@@ -418,7 +418,7 @@ spec:
                 - name: MIN_SIZE
                   value: 500M
                 - name: PASSES
-                  value: "3"
+                  value: "1"
                 - name: TEST_DIR
                   value: _opencloud-migrationstest
               securityContext:
