@@ -86,5 +86,31 @@ data:
           grep -v '^= ' /work/repair-combined.txt || true
         fi
         ;;
+      readtest)
+        # Diagnose gekippter Bits (24.11.2026): große Dateien aus 0_PRIVAT mehrfach lesen, einmal über
+        # OpenCloud (WebDAV -> iSCSI) und einmal direkt über NFS (PrivateCloud), beides auf derselben QNAP.
+        # Abweichung in jedem Durchlauf = falsch gespeichert; nur in einzelnen = Lesefehler.
+        # Nur NFS betroffen oder beide = Ursache in der QNAP; nur OpenCloud = iSCSI-/Netzwerkpfad.
+        # Schreibt nichts. PrivateCloud kann bei neueren Dateien legitim von Dropbox abweichen (dann stabil).
+        F="--min-size $MIN_SIZE $X_PRIV"
+        rclone hashsum dropbox dropbox:0_PRIVAT --fast-list --tpslimit 12 $F --output-file /work/priv.sum
+        echo "Dateien ab $MIN_SIZE: $(wc -l < /work/priv.sum)"
+        for i in $(seq 1 "$PASSES"); do
+          for t in oc nfs; do
+            [ "$t" = oc ] && R="opencloud:0_PRIVAT" || R="/seed"
+            echo "== Durchlauf $i/$PASSES, $t =="
+            rclone checksum dropbox /work/priv.sum "$R" --download --one-way --checkers 8 $F \
+              --low-level-retries 20 --timeout 1h --stats 10m --stats-one-line --stats-log-level NOTICE \
+              --log-level NOTICE --combined "/work/$t-$i.txt" || true
+            printf "gleich %s, fehlt %s, abweichend %s, Fehler %s\n" \
+              "$(grep -c '^= ' "/work/$t-$i.txt" || true)" "$(grep -c '^- ' "/work/$t-$i.txt" || true)" \
+              "$(grep -c '^\* ' "/work/$t-$i.txt" || true)" "$(grep -c '^! ' "/work/$t-$i.txt" || true)"
+          done
+        done
+        for t in oc nfs; do
+          echo "== $t: Abweichungen je Datei (Anzahl Durchläufe von $PASSES) =="
+          cat /work/$t-*.txt | grep -E '^[*!-] ' | sort | uniq -c | sort -rn || true
+        done
+        ;;
       *) echo "unbekannter MODE=$MODE"; exit 2 ;;
     esac
