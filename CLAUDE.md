@@ -65,6 +65,11 @@ Sprache im Gespräch: **Deutsch**. Abkürzungen ausschreiben (z.B. „Pull Reque
 | `docs/rezepte/` | ausführbare Rezepte | Rezept des laufenden Vorhabens ist die Arbeitsgrundlage |
 | `renovate.json` | Renovate-Regeln | Regeln mit `description` im bestehenden Stil |
 | `tls.key`, `tls.crt` | lokal, ignoriert | nie lesen |
+| `wartung/` | Wartungsskripte (`wartung/scripts/`, Einstieg `README.md`), Rezepte und Protokolle des Wartungsfensters | lokal, per `.gitignore` ausgeschlossen; nie `git add -f`; `~/scripts` verweist hierher |
+
+## Wartungsfenster
+
+Monatlich am letzten Sonntag (nächstes: 29.11.2026). Arbeitsgrundlage liegt lokal in `wartung/`: zuerst `wartung/scripts/README.md`, dann das darin genannte Rezept. Die Skripte ändern Cluster, QNAP, Proxmox und Gäste und führt **nur Rico** aus; ich bereite Aufrufe vor, lese Ausgaben und prüfe nach. Selbst ausführen darf ich nur lesende Modi ohne Passworteingabe (`qnap-wartung.sh --nur-pruefen`, `07-post-verify.sh --skip-write-test`). Inhalte aus `wartung/` nie in versionierte Dateien, Commits oder Pull Requests übernehmen.
 
 ## Laufendes Vorhaben
 

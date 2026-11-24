@@ -7,3 +7,7 @@ f55bbfc3-de37-4203-a0f9-8e65079c4004.json
 
 # Claude Code: lokale, persönliche Freigaben nicht versionieren
 .claude/settings.local.json
+
+# Wartung: Betriebsskripte, Rezepte und Protokolle bleiben lokal (enthalten interne Adressen,
+# Zugänge und Abläufe; das Repository ist öffentlich). ~/scripts verweist hierher.
+/wartung/
