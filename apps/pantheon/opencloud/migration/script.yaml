@@ -18,6 +18,23 @@ data:
     # Ausschluss als Absicherung, falls irgendwo noch ein Rest liegt. Pfade relativ zu 0_PRIVAT bzw. zur Wurzel.
     X_PRIV="--exclude /05_ARBEITGEBER/Matrix42?AG/07_IT/Technical?Demos/EgoSecure?Demo/**"
     X_ROOT="--exclude /0_PRIVAT/05_ARBEITGEBER/Matrix42?AG/07_IT/Technical?Demos/EgoSecure?Demo/**"
+    # Stolperstein 12: kein gemeinsamer Hash zwischen Dropbox und WebDAV. Das OpenCloud-Volume lässt
+    # sich nicht zusätzlich einhängen (Trident/iSCSI: "already mounted", 23.11.2026). Deshalb:
+    # Dropbox-Hashes aus der API holen, dann jede Datei über WebDAV lesen und den Hash selbst berechnen.
+    hashes() {
+      rclone hashsum dropbox dropbox: --fast-list --tpslimit 12 $X_ROOT --output-file /work/dropbox.sum
+      echo "Dropbox-Hashes: $(wc -l < /work/dropbox.sum)"
+    }
+    verify() {  # $1 = Hash-Liste, $2 = Ergebnisdatei; ohne --tpslimit, Dropbox ist hier nicht beteiligt
+      rclone checksum dropbox "$1" opencloud: --download --one-way --checkers 8 $X_ROOT \
+        --low-level-retries 20 --timeout 1h --stats 10m --stats-one-line --stats-log-level NOTICE \
+        --log-level NOTICE --combined "$2" || true
+      echo "== Zusammenfassung =="
+      printf "gleich:      %s\n" "$(grep -c '^= ' "$2" || true)"
+      printf "fehlt:       %s\n" "$(grep -c '^- ' "$2" || true)"
+      printf "abweichend:  %s\n" "$(grep -c '^\* ' "$2" || true)"
+      printf "Fehler:      %s\n" "$(grep -c '^! ' "$2" || true)"
+    }
     case "$MODE" in
       probe)
         rclone about dropbox: || true
@@ -47,21 +64,27 @@ data:
         rclone copy dropbox: opencloud: --fast-list --transfers 4 --checkers 8 $X_ROOT $L --log-level NOTICE
         ;;
       check)
-        # Stolperstein 12: kein gemeinsamer Hash zwischen Dropbox und WebDAV. Das OpenCloud-Volume lässt
-        # sich nicht zusätzlich einhängen (Trident/iSCSI: "already mounted", 23.11.2026). Deshalb:
-        # Dropbox-Hashes aus der API holen, dann jede Datei über WebDAV lesen und den Hash selbst berechnen.
-        rclone hashsum dropbox dropbox: --fast-list --tpslimit 12 $X_ROOT --output-file /work/dropbox.sum
-        echo "Dropbox-Hashes: $(wc -l < /work/dropbox.sum)"
-        rclone checksum dropbox /work/dropbox.sum opencloud: --download --one-way --checkers 8 $X_ROOT \
-          --low-level-retries 20 --timeout 1h --stats 10m --stats-one-line --stats-log-level NOTICE \
-          --log-level NOTICE --combined /work/combined.txt || true   # ohne --tpslimit: Dropbox ist hier nicht beteiligt
-        echo "== Zusammenfassung =="
-        printf "gleich:      %s\n" "$(grep -c '^= ' /work/combined.txt || true)"
-        printf "fehlt:       %s\n" "$(grep -c '^- ' /work/combined.txt || true)"
-        printf "abweichend:  %s\n" "$(grep -c '^\* ' /work/combined.txt || true)"
-        printf "Fehler:      %s\n" "$(grep -c '^! ' /work/combined.txt || true)"
+        hashes
+        verify /work/dropbox.sum /work/combined.txt
         echo "== Abweichungen (max. 200) =="
         grep -v '^= ' /work/combined.txt | head -200 || true
+        ;;
+      repair)
+        # Prüfen, abweichende und fehlende Dateien aus Dropbox neu übertragen, nur diese erneut prüfen.
+        # Die Liste entsteht im Pod und landet nicht im (öffentlichen) Repository (G.4, 24.11.2026).
+        hashes
+        verify /work/dropbox.sum /work/combined.txt
+        grep -E '^[*-] ' /work/combined.txt | cut -c3- > /work/differ.txt || true
+        echo "Neu zu übertragen: $(wc -l < /work/differ.txt)"
+        if [ -s /work/differ.txt ]; then
+          rclone copy dropbox: opencloud: --files-from /work/differ.txt --ignore-times --no-traverse \
+            --transfers 4 $L --log-level INFO
+          awk 'NR==FNR{w[$0]=1; next} {p=substr($0, index($0, "  ")+2); if (p in w) print}' \
+            /work/differ.txt /work/dropbox.sum > /work/repair.sum
+          echo "== Nachprüfung der neu übertragenen Dateien =="
+          verify /work/repair.sum /work/repair-combined.txt
+          grep -v '^= ' /work/repair-combined.txt || true
+        fi
         ;;
       *) echo "unbekannter MODE=$MODE"; exit 2 ;;
     esac
