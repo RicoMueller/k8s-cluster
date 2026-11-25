@@ -69,7 +69,7 @@ Sprache im Gespräch: **Deutsch**. Abkürzungen ausschreiben (z.B. „Pull Reque
 
 ## Wartungsfenster
 
-Monatlich am letzten Sonntag (nächstes: 29.11.2026). Arbeitsgrundlage liegt lokal in `wartung/`: zuerst `wartung/scripts/README.md`, dann das darin genannte Rezept. Die Skripte ändern Cluster, QNAP, Proxmox und Gäste und führt **nur Rico** aus; ich bereite Aufrufe vor, lese Ausgaben und prüfe nach. Selbst ausführen darf ich nur lesende Modi ohne Passworteingabe (`qnap-wartung.sh --nur-pruefen`, `07-post-verify.sh --skip-write-test`). Inhalte aus `wartung/` nie in versionierte Dateien, Commits oder Pull Requests übernehmen.
+Monatlich am letzten Sonntag (nächstes: 29.11.2026). Arbeitsgrundlage liegt lokal in `wartung/`: zuerst `wartung/scripts/README.md`, dann das darin genannte Rezept. Die Skripte ändern Cluster, QNAP, Proxmox und Gäste und führt **nur Rico** aus; ich bereite Aufrufe vor, lese Ausgaben und prüfe nach. Selbst ausführen darf ich nur lesende Modi ohne Passworteingabe (`qnap-wartung.sh --nur-pruefen` und `--trocken`, `07-post-verify.sh --skip-write-test`). Startprompt und Agenda fürs nächste Fenster: Rezept Abschnitt 0.4a. Inhalte aus `wartung/` nie in versionierte Dateien, Commits oder Pull Requests übernehmen.
 
 ## Laufendes Vorhaben
 
