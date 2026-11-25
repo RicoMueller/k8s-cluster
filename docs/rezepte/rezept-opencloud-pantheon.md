@@ -4,7 +4,7 @@
 >
 > Das Rezept ist in **Blöcke** geschnitten, die Claude Code jeweils in einem Stück abarbeitet. Unterbrechungen gibt es nur an den markierten **⏸ HALT**-Punkten — dort, wo Rico eingreifen muss (Secrets, Weboberflächen, `cloudflared`, Geräte, unumkehrbare Entscheidungen). Ablageort im Repo: `docs/rezepte/rezept-opencloud-pantheon.md`.
 
-*Rezeptversion: 1.2 — November 2026 · Cluster: Pantheon · Zielversion: OpenCloud 9.1.x (Production-Linie; bis 18.11.2026 7.2.x)*
+*Rezeptversion: 1.3 — 25.11.2026 · Cluster: Pantheon · Zielversion: OpenCloud 9.1.x (Production-Linie; bis 18.11.2026 7.2.x)*
 
 > **Status:** Nicht live verifiziert. Version 1.2 enthält die Ergebnisse und Entscheidungen aus Teil 0 (16.11.2026, Details in `apps/pantheon/opencloud/UPSTREAM.md`). Version 1.1 ist gegen den Repository-Stand vom 16.11.2026 abgeglichen (Commit `1a72f8c`): Gateway nur mit HTTP-Listener `http`, cert-manager über `infrastructure-cert-manager`, Tunnel `pantheon-apps` mit Catch-all auf `cilium-gateway-pantheon-gateway:80`, `.sops.yaml` verschlüsselt `data`/`stringData` in jeder `*.yaml`, IONOS-SMTP für AFFiNE live seit 13.11.2026 (SPF, DKIM `s1-ionos`, DMARC `p=none`). Faktenbasis OpenCloud: Dokumentation 7.2 (Keycloak-, External-IdP-, PosixFS-, Notifications-, App-Token-, Link-Passwort-Seiten), README von `opencloud-eu/opencloud-compose`, Releases `opencloud-eu/opencloud` (7.2.3 vom 06.08.2026), rclone-WebDAV-Doku. Was sich nur aus den Compose-Dateien selbst ergibt (Images, Realm-Datei, LDAP-Seed, CSP), gleicht Claude Code in **Teil 0** gegen das Upstream-Repo ab und trägt es ein. Nach jedem Block die Erwartungswerte mit den echten Ausgaben abgleichen (Ergebnisprotokoll am Blockende).
 
@@ -111,8 +111,8 @@ Claude Code trägt die Ist-Werte direkt in die Rezeptdatei ein und committet sie
 | C ✅ 17.11.2026 | Keycloak-DB, Keycloak mit SMTP, Routen | ~15 Min | ~40 Min | 1 | Identität läuft (LAN), Keycloak sendet Mails |
 | D ✅ 18.11.2026 | OpenCloud mit Mail-Benachrichtigungen, WOPI, Collabora, Routen, Renovate | ~10 Min | ~40 Min | 1 | OpenCloud im LAN nutzbar |
 | E ✅ 20.11.2026 | Sicherheits-Gate, DNS-Routen, externe Prüfungen, Geräte | ~20 Min | ~20 Min | 2 | von außen + Apps |
-| F | Dropbox-Zugang, Testkopie, Vollkopie starten | ~20 Min | ~30 Min + Laufzeit (Tage) | 1 | Kopie läuft im Hintergrund |
-| G | Delta-Lauf, Hash-Prüfung, Bericht | — | ~30 Min | 0 | — |
+| F ✅ 23.11.2026 | Dropbox-Zugang, Testkopie, Vorbefüllung aus PrivateCloud (F.4a), Vollkopie | ~20 Min | ~30 Min + Laufzeit (Tage) | 1 | Kopie läuft im Hintergrund |
+| G ⏸ seit 24.11.2026 (G.1–G.3 ✅, G.4 offen bis nach dem Speichertest der QNAP am 29.11.2026) | Delta-Lauf, Hash-Prüfung, Reparatur, Bericht | — | ~30 Min + Prüfläufe (Stunden) | 0 | — |
 | H | Off-site-Ziel, QNAP-Snapshots, Backup-Job, Restore-Probe | ~20 Min | ~40 Min + Erstlauf (Tage) | 1 | Backup aktiv |
 | I | Dropbox einfrieren, Schlusskopie, Geräte umstellen, Freigaben | 30–60 Min | ~15 Min | 2 | Dropbox ruht |
 | J | Entscheidungstor, Dropbox-App deinstallieren, Abo kündigen, Aufräumen | ~20 Min | ~10 Min | — | Migrationsreste entfernt |
@@ -2148,17 +2148,25 @@ grep -n '| Freier Speicher nach 0.6 |' docs/rezepte/rezept-opencloud-pantheon.md
 # Erwartung: Ist-Spalte gefüllt und >= 3,6 TB (Teil 0.6). Leer oder kleiner -> STOPP, Rico an 0.6 erinnern.
 ```
 
+> **Korrektur 22.11.2026 — Schwelle während der Migration.** Die 3,6 TB gelten für den Start. Nach dem Löschen großer Daten aus OpenCloud meldet der Pool trotzdem wenig frei (22.11.: 2,7 TB), weil ext4 freie Blöcke der schlanken iSCSI-LUN erst per `fstrim` an die QNAP zurückgibt. Solange die LUN schon größer belegt war, als die Migration noch braucht, schreibt ext4 in diese Blöcke zurück, und der Pool sinkt kaum weiter. Bewertung dann: `noch zu kopieren` ≤ `bereits belegte LUN − Inhalt` → weiter; sonst STOPP. `fstrim` ist Eingangsprüfung von Block H (vor den ersten Snapshots).
+
 ## F.1 — ⏸ HALT: Zugänge für die Migration *(Rico, ~20 Min)*
 
 > **⏸ HALT [Rico]**
 >
-> **1. Dropbox-App** (`https://www.dropbox.com/developers/apps` → Create app): *Scoped access*, *Full Dropbox*, Name z. B. `pantheon-migration`. Unter **Settings → OAuth 2 → Redirect URIs** `http://localhost:53682/` eintragen (sonst scheitert `rclone authorize` mit eigener App). Unter **Permissions**: `files.metadata.read`, `files.content.read` → Submit. App key und App secret notieren.
+> **1. Dropbox-App** (`https://www.dropbox.com/developers/apps` → Create app): *Scoped access*, *Full Dropbox*, Name z. B. `pantheon-migration`. Unter **Settings → OAuth 2 → Redirect URIs** `http://localhost:53682/` eintragen (sonst scheitert `rclone authorize` mit eigener App). Unter **Permissions** genau diese fünf: `account_info.read`, `files.metadata.write`, `files.content.read`, `files.content.write`, `sharing.write` → Submit (rclone 1.76.0 fragt sie bei `authorize` fest an; Dropbox lehnt die Freigabe sonst ab — Stolperstein 37). **Erst die Berechtigungen setzen, dann das Token holen.** App key und App secret im Passwortmanager ablegen.
 >
-> **2. OpenCloud-App-Token:** im Browser → Benutzermenü → Einstellungen → **App-Tokens** → Neu → Name `rclone-migration`, Ablauf **30 Tage** → Token kopieren.
+> **2. OpenCloud-App-Token** (Voraussetzung: Dienst `auth-app` läuft, `OC_ADD_RUN_SERVICES` enthält `auth-app` — seit 20.11.2026 in D.4): im eigenen Terminal, der Token wird nur dort angezeigt:
+> ```bash
+> kubectl exec -n opencloud deploy/opencloud -c opencloud -- opencloud auth-app create --user-name rico --expiration 720h
+> ```
+> Im Passwortmanager ablegen als „OpenCloud – App-Token rclone-migration (rico)“.
+>
+> **2a. Keycloak-ID von rico** (kein Geheimnis): Keycloak-Admin-Konsole → Realm `openCloud` → Users → rico → Feld **ID**. Sie ist der WebDAV-Benutzername für App-Tokens, weil OpenCloud Konten unter `sub` anlegt (`PROXY_AUTOPROVISION_CLAIM_USERNAME=sub`, Stolperstein 38). Probe vorab: `curl -s -o /dev/null -w '%{http_code}\n' -u "ID:TOKEN" -X PROPFIND -H 'Depth: 0' https://cloud.rm-it.org/remote.php/webdav/` → `207`.
 >
 > **3. Testordner in Dropbox** `_opencloud-migrationstest` mit: einer Datei mit Umlauten im Namen (`Übungsliste – März.txt`), einem sehr langen Dateinamen, einer Datei > 1 GB, einem Unterordner.
 >
-> **4. Token holen und Secret schreiben** (eigenes Terminal; `rclone authorize` öffnet den Browser zur Dropbox-Freigabe und gibt danach eine JSON-Zeile aus, die der Block direkt übernimmt):
+> **4. Token holen und Secret schreiben** — als **Skriptdatei** mit `bash datei.sh` starten, nicht als Einfügeblock: Beim Einfügen frisst `read` die Folgezeilen (wie in A.2). `rclone authorize` öffnet den Browser zur Dropbox-Freigabe und gibt danach eine JSON-Zeile aus, die das Skript übernimmt:
 > ```bash
 > (
 > cd ~/k8s-cluster || exit 1
@@ -2171,6 +2179,7 @@ grep -n '| Freier Speicher nach 0.6 |' docs/rezepte/rezept-opencloud-pantheon.md
 > DBX_TOKEN=$(rclone authorize dropbox "$DBX_KEY" "$DBX_SECRET" 2>/dev/null | grep -o '{.*}' | tail -1)
 > test -n "$DBX_TOKEN" || { echo "ABBRUCH: kein Token von rclone authorize"; exit 1; }
 > printf "OpenCloud-App-Token: ";   read -rs OC_TOKEN; echo
+> printf "Keycloak-ID von rico: ";  read -r  OC_USER
 > OC_PASS=$(printf '%s' "$OC_TOKEN" | rclone obscure -)
 > CONF=$(mktemp)
 > cat > "$CONF" <<EOF
@@ -2184,13 +2193,13 @@ grep -n '| Freier Speicher nach 0.6 |' docs/rezepte/rezept-opencloud-pantheon.md
 > type = webdav
 > url = http://opencloud.opencloud.svc.cluster.local:9200/remote.php/webdav
 > vendor = owncloud
-> user = rico
+> user = ${OC_USER}
 > pass = ${OC_PASS}
 > EOF
 > kubectl create secret generic opencloud-migration -n opencloud \
 >   --from-file=rclone.conf="$CONF" --dry-run=client -o yaml > "$F"
 > rm -f "$CONF"
-> unset DBX_KEY DBX_SECRET DBX_TOKEN OC_TOKEN OC_PASS
+> unset DBX_KEY DBX_SECRET DBX_TOKEN OC_TOKEN OC_PASS OC_USER
 > sops --encrypt --in-place "$F" || { rm -f "$F"; echo "ABBRUCH: sops fehlgeschlagen, Datei entfernt"; }
 > grep -c 'ENC\[' "$F"
 > )
@@ -2204,54 +2213,21 @@ grep -n '| Freier Speicher nach 0.6 |' docs/rezepte/rezept-opencloud-pantheon.md
 
 ## F.2 — Skript und suspendierte CronJobs *(Claude Code)*
 
-`apps/pantheon/opencloud/migration/script.yaml`:
+`apps/pantheon/opencloud/migration/script.yaml` — ConfigMap `opencloud-migration-script` mit `migrate.sh`. **Maßgeblich ist die Datei im Repository**; der ursprüngliche Entwurf dieses Abschnitts ist durch die Befunde aus F und G überholt. Stand 25.11.2026:
 
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: opencloud-migration-script
-  namespace: opencloud
-data:
-  migrate.sh: |
-    #!/bin/sh
-    set -eu
-    # rclone schreibt beim Token-Refresh in die Config -> beschreibbare Kopie (Stolperstein 10)
-    cp /secret/rclone.conf /work/rclone.conf
-    export RCLONE_CONFIG=/work/rclone.conf HOME=/work
-    L="--tpslimit 12 --retries 10 --low-level-retries 20 --stats 10m --stats-one-line --stats-log-level NOTICE"
-    case "$MODE" in
-      probe)
-        rclone about dropbox: || true
-        rclone size dropbox: --fast-list --tpslimit 12
-        rclone lsd dropbox: --tpslimit 12
-        rclone about opencloud: || true
-        rclone lsd opencloud:
-        ;;
-      test)
-        rclone copy "dropbox:$TEST_DIR" "opencloud:$TEST_DIR" $L --log-level INFO
-        rclone lsl "opencloud:$TEST_DIR"
-        ;;
-      copy)
-        rclone copy dropbox: opencloud: --fast-list --transfers 4 --checkers 8 $L --log-level NOTICE
-        ;;
-      check)
-        # Dropbox-Hash gegen den lokalen PosixFS-Baum (lesend eingehängt), Stolperstein 12
-        rclone check dropbox: "$SPACE_PATH" --one-way --fast-list --tpslimit 12 \
-          --combined /work/combined.txt || true
-        echo "== Zusammenfassung =="
-        printf "gleich:      %s\n" "$(grep -c '^= ' /work/combined.txt || true)"
-        printf "fehlt:       %s\n" "$(grep -c '^- ' /work/combined.txt || true)"
-        printf "abweichend:  %s\n" "$(grep -c '^\* ' /work/combined.txt || true)"
-        printf "Fehler:      %s\n" "$(grep -c '^! ' /work/combined.txt || true)"
-        echo "== Abweichungen (max. 200) =="
-        grep -v '^= ' /work/combined.txt | head -200 || true
-        ;;
-      *) echo "unbekannter MODE=$MODE"; exit 2 ;;
-    esac
-```
+| `MODE` | Was | Seit |
+|---|---|---|
+| `probe` | `about`/`size`/`lsd` beider Seiten (F.3) | 20.11. |
+| `test` | Testordner kopieren und listen (F.4) | 20.11. |
+| `seed` | Vorbefüllung `/seed` (PrivateCloud, NFS nur lesend) → `opencloud:0_PRIVAT`, `--ignore-existing`, QNAP-Müll ausgeschlossen (F.4a) | 20.11., Ausschlüsse 23.11. |
+| `copy` | `rclone copy dropbox: opencloud:` — **kein `sync`** (F.5) | 23.11. |
+| `check` | Dropbox-Hashes per API (`hashsum`), dann jede Datei über WebDAV lesen und vergleichen (`checksum --download`) (G.3) | 23.11. |
+| `repair` | wie `check`, abweichende/fehlende Dateien mit `--files-from --ignore-times` neu aus Dropbox, nur diese nachprüfen (G.4a) | 24.11. |
+| `readtest` | große Dateien (`MIN_SIZE`) `PASSES`-mal über OpenCloud und NFS lesen, Abweichungen je Datei zählen — Diagnose gekippter Bits (G.4b) | 24.11. |
 
-`apps/pantheon/opencloud/migration/cronjobs.yaml` — vier suspendierte CronJobs (`migration-probe`, `migration-test`, `migration-copy`, `migration-check`), identisch bis auf Name, `MODE` und die Zusätze für `check`. Vorlage `migration-copy`:
+Gemeinsam: `--tpslimit 12` (nur Dropbox), `--retries 10`, `--low-level-retries 20`, **`--timeout 1h`** (Stolperstein 39), Ausschluss eines gelöschten Altordners (`X_PRIV`/`X_ROOT`). Listen mit Dateipfaden entstehen nur im Pod (`/work`), nie im Repository (öffentlich).
+
+`apps/pantheon/opencloud/migration/cronjobs.yaml` — suspendierte CronJobs, je `MODE` einer (`migration-probe`, `-test`, `-seed`, `-copy`, `-check`, `-repair`, `-readtest`), identisch bis auf Name, `MODE` und die Zusätze für `seed`/`readtest` (NFS-Volume, siehe F.4a). Vorlage `migration-copy`:
 
 ```yaml
 apiVersion: batch/v1
@@ -2317,17 +2293,7 @@ spec:
               emptyDir: {}
 ```
 
-**Zusätze für `migration-check`:** `env` `SPACE_PATH=/data<Rest von SPACE_PATH aus D.10 ab /var/lib/opencloud>`; Volume `data` → PVC `opencloud-data`, **`readOnly: true`**, gemountet unter `/data`; Pod-Affinität zum OpenCloud-Pod (RWO, gleicher Node):
-
-```yaml
-          affinity:
-            podAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                - labelSelector:
-                    matchLabels:
-                      app: opencloud
-                  topologyKey: kubernetes.io/hostname
-```
+**Kein Daten-Volume für `migration-check`.** Der ursprüngliche Plan (PVC `opencloud-data` lesend zusätzlich einhängen, `podAffinity`) scheitert an Trident: Das iSCSI-Gerät wird pro Pod direkt eingehängt, ein zweiter Mount desselben ext4-Geräts endet mit `already mounted` (exit 32), auch lesend. Die Prüfung läuft deshalb über WebDAV (G.3, Stolperstein 12).
 
 > **⚠️ Stolperstein 10 — rclone braucht eine beschreibbare Config.** Der Dropbox-Zugang besteht aus einem kurzlebigen Access-Token und einem Refresh-Token. rclone erneuert das Access-Token während des Laufs und will es in die Config zurückschreiben. Ein schreibgeschützt gemountetes Secret führt dann zu Fehlermeldungen beim Speichern; darum kopiert das Skript die Config zuerst nach `/work`.
 
@@ -2344,7 +2310,7 @@ git show --stat HEAD                   # Rico zeigen, Freigabe abwarten
 git pull --rebase && git push
 flux reconcile kustomization flux-system --with-source
 kubectl get cronjob -n opencloud
-# Erwartung: vier migration-*-CronJobs, SUSPEND True
+# Erwartung: alle migration-*-CronJobs, SUSPEND True (Stand 25.11.: sieben)
 ```
 
 ## F.3 — Bestandsaufnahme
@@ -2369,6 +2335,8 @@ kubectl logs -n opencloud job/mig-probe-1
 > **Bewertung:** Änderungszeiten stimmen **und** > 1 TB deckungsgleich → Vorbefüllung als neuer Schritt F.4a (PrivateCloud **nur lesend** per NFS in einen Job einhängen, Kopie nach OpenCloud, danach F.5 als Delta mit `rclone sync`, damit in Dropbox gelöschte Altdateien nicht in OpenCloud bleiben). Sonst: direkter Weg wie geplant (Architekturentscheidung 6). In beiden Fällen prüft G.3 jede Datei gegen den Dropbox-Inhalts-Hash — die Herkunft einer Datei ändert den Nachweis nicht.
 >
 > **Fortsetzungssatz:** „Vorbefüllung ja" oder „direkter Weg".
+>
+> **Ergebnis 20.11.2026:** PrivateCloud ist ein Spiegel von **`0_PRIVAT`** (nicht der ganzen Dropbox): 71 412 Dateien / 1454 GB in Dropbox, davon **71 154 mit gleicher Größe und Änderungszeit (1453,9 GB)**, 3 mit anderer Änderungszeit, der Rest (< 0,2 GB) fast nur 8.3-Kurznamen, die QTS über SMB anzeigt (über NFS stimmen die Namen). Entscheidung Rico: **Vorbefüllung ja** → F.4a.
 
 ## F.4 — Testkopie
 
@@ -2386,6 +2354,31 @@ kubectl exec -n opencloud deploy/opencloud -c opencloud -- \
 
 > **⚠️ Stolperstein 22 — Interner WebDAV-Weg verweigert.** Antwortet `opencloud:` mit 401: App-Auth nicht aktiv (`PROXY_ENABLE_APP_AUTH`) oder falscher Benutzername. Mit 404/Weiterleitung: `/remote.php/webdav` wird nicht wie erwartet bedient — dann in der Config `url = https://cloud.rm-it.org/remote.php/webdav` und im CronJob `hostAliases` (cloud.rm-it.org → Gateway-IP) verwenden. Die Änderung ist ein Commit (CronJob) plus Rico-Änderung am Secret → **STOPP**, Rico informieren.
 
+## F.4a — Vorbefüllung aus PrivateCloud *(seit 20.11.2026)*
+
+Voraussetzung (Rico, QTS): Freigabeordner PrivateCloud → Berechtigungen → **NFS-Hostzugriff** → `192.168.178.0/24`, **schreibgeschützt** (wie die Paperless-Freigaben). Prüfen: `showmount -e 192.168.178.42` zeigt `/PrivateCloud`.
+
+Manifeste: `migration/seed-nfs.yaml` (PV/PVC `privatecloud-seed-ro`, **doppelt schreibgeschützt**: `mountOptions: [ro]` und `readOnly: true` am Volume) und CronJob `migration-seed` (`MODE=seed`).
+
+```bash
+kubectl create job -n opencloud --from=cronjob/migration-seed mig-seed-2
+kubectl wait --for=condition=Ready pod -l job-name=mig-seed-2 -n opencloud --timeout=5m
+kubectl logs -n opencloud job/mig-seed-2 --tail=5
+```
+
+**Verlauf 20.–23.11.2026:**
+
+| Lauf | Ergebnis |
+|---|---|
+| `mig-seed-1` | ~28 MiB/s im LAN; nach 1 Tag **Schleife**: Uploads großer Disk-Images (17–129 GB) liefen in rclones 5-Minuten-Timeout, wurden bis zu 20-mal wiederholt und füllten Papierkorb (1,6 TB) und Upload-Reste (826 GB); PVC 93 % voll. Job von Rico gelöscht. Stolperstein 39. |
+| Aufräumen (22.11.) | Der betroffene Ordner (Demo-VMs eines früheren Arbeitgebers, 865 GB, seit 2019 unverändert) wurde auf Ricos Entscheidung **in Dropbox, PrivateCloud und OpenCloud gelöscht** und ist in allen Modi ausgeschlossen. Papierkorb geleert; die Upload-Reste verschwanden erst nach einem Neustart von OpenCloud (`uploads sessions --clean` hing ohne Wirkung). |
+| `mig-seed-2` | `--timeout 1h`; **447 GiB, ~65 700 Dateien in 6 h 45 min, 0 Fehler am Ende** (5 × `computed checksum does not match` im ersten Durchgang, im Wiederholungsversuch fehlerfrei — rückblickend erstes Zeichen von Stolperstein 40) |
+| `mig-seed-3` | Wiederherstellung nach versehentlich geleertem Papierkorb (F.5): `--ignore-existing`, `INFO`-Log je Datei → **13 Dateien zurück, 0 Fehler, 7 min** |
+
+> **QNAP-Müll ausschließen:** `.streams/**` (Ablage der macOS-Dateiattribute aus SMB, ~3 450 Dateien), `.smbdelete*`, `~$*` (Office-Sperrdateien), dazu `@Recycle`, `@__thumb`, `.DS_Store`. Ohne diese Ausschlüsse wollte F.5 sie wieder löschen.
+
+> **Desktop-Client während der Migration pausieren.** OpenCloud Desktop 4.0.0 synchronisiert unter macOS jeden neuen Hauptordner vollständig auf den Mac (keine Platzhalter, Abfrage für große Ordner nicht gefunden). Bis Block I: Menüleiste → ⋯ → **Synchronisation anhalten**.
+
 ## F.5 — Vollkopie starten
 
 ```bash
@@ -2401,15 +2394,32 @@ Claude Code beendet den Block mit einer **Hochrechnung** aus der ersten Statisti
 
 > **Wiederaufsetzbar:** Bricht der Job ab (Node-Neustart, Netz), einfach `mig-copy-2` aus derselben Vorlage starten. `rclone copy` überspringt Dateien mit gleicher Größe und Änderungszeit.
 
+> **Korrektur 23.11.2026 — `copy` statt `sync`.** Der erste Entwurf nach der Vorbefüllung nutzte `rclone sync` für `0_PRIVAT` (mit `--max-delete 1000`). `mig-copy-1` brach zweimal an der Löschgrenze ab: Löschen wollte er außer QNAP-Müll vor allem **Dokumente, die nur auf PrivateCloud lagen** (Reisedokumente, in Dropbox nie angekommen). `copy` löscht nie; überschriebene Fassungen landen im OpenCloud-Papierkorb. Was in Dropbox gelöscht wurde, bleibt in OpenCloud — das ist hier gewollt.
+
+> **Aufräumen nie über die Weboberfläche mischen.** Beim Löschen von `.streams`, Wiederherstellen und Papierkorb-Leeren in einem Durchgang wurde der Papierkorb vor der Wiederherstellung geleert (F.4a, `mig-seed-3`). Solche Schritte als Job oder Befehl, einzeln, mit Prüfung vor jedem unumkehrbaren Schritt.
+
+**Verlauf:** `mig-copy-2` (23.11.2026, 12:13–17:48 Uhr): **373,4 GiB, 24 756 Dateien, 5 h 34 min, ~13–19 MiB/s, 0 Fehler am Ende** (5 Dateien aus einer dreiminütigen Dropbox-Störung `failed to open source object` im Wiederholungsversuch durch). OpenCloud-Volume danach 926 GB (32 %).
+
+> **⚠️ Stolperstein 37 — Dropbox-Berechtigungen.** rclone 1.76.0 fragt bei `authorize` fest `account_info.read`, `files.metadata.write`, `files.content.read`, `files.content.write`, `sharing.write` an. Fehlt eine davon in der App, lehnt Dropbox die Freigabe ab. Die Jobs lesen trotzdem nur.
+
+> **⚠️ Stolperstein 38 — App-Token: Benutzer = Keycloak-ID.** Mit Autoprovisioning über `sub` heißt das Konto intern wie die Keycloak-ID. `user = rico` ergibt `401`, ebenso die interne OpenCloud-Konto-ID. Ohne laufenden Dienst `auth-app` gibt es gar keine App-Tokens.
+
+> **⚠️ Stolperstein 39 — Upload-Schleife bei großen Dateien.** Nach einem PUT von mehreren GB antwortet OpenCloud erst nach Minuten. Mit rclones Standard-`--timeout 5m` bricht der Client ab, wiederholt (bis zu 20-mal) und jede abgebrochene Fassung bleibt als Upload-Rest oder Papierkorb-Eintrag liegen. Gegenmittel `--timeout 1h`; Upload-Reste und Papierkorb nach großen Läufen prüfen.
+
+> **⚠️ Stolperstein 40 — Gekippte Bits durch den QNAP-Speicher.** Einzelne Bits kippen beim Schreiben und Lesen (≈ 1 je 35 GiB), unbemerkt, weil QNAP-RAM ohne ECC und ext4 ohne Datenprüfsummen. Erste Anzeichen waren `computed checksum does not match` beim Hochladen. Jede große Datenbewegung braucht eine Hash-Prüfung; Prüfsummenfehler sind ein Hardware-Warnsignal, kein „vorübergehender Fehler“. Diagnose in G.4b.
+
 ### Ergebnisprotokoll Block F
 
 | Prüfpunkt | Erwartung | Ist |
 |---|---|---|
-| Dropbox gesamt (Größe / Dateien) | ≈ `DROPBOX_GB` | |
-| Kontingent OpenCloud | unbegrenzt | |
-| PrivateCloud gegen Dropbox (deckungsgleich / mtime-Stichprobe) → Entscheidung Vorbefüllung | — | |
-| Testkopie: Umlaute, langer Name, 1 GB, mtime | ok | |
-| Übertragungsrate / Hochrechnung | — | |
+| Dropbox gesamt (Größe / Dateien) | ≈ `DROPBOX_GB` | ✅ 1,687 TiB (1855 GB) / 96 168 Dateien (20.11.); Kontingent 2,0 TiB. Nach Löschung des Altordners ≈ 990 GB |
+| Kontingent OpenCloud | unbegrenzt | ✅ keine Grenze gemeldet |
+| Zugang OpenCloud (WebDAV) | `207` | ❌→✅ `401` mit `user = rico`; Benutzer = Keycloak-ID, dazu `auth-app` eingeschaltet (Stolperstein 38) |
+| PrivateCloud gegen Dropbox → Entscheidung Vorbefüllung | — | ✅ 71 154 von 71 412 Dateien in `0_PRIVAT` deckungsgleich → **Vorbefüllung ja** |
+| Testkopie: Umlaute, langer Name (211 Zeichen), 1,18 GB, Unterordner, mtime | ok | ✅ alle; MD5 der Großdatei am Ziel = Original; 24,7 MiB/s |
+| Vorbefüllung (`mig-seed-2`) | Fehler 0 | ✅ 447 GiB / ~65 700 Dateien, 6 h 45 min, 0 (nach Wiederholung) |
+| Vollkopie (`mig-copy-2`) / Hochrechnung | — | ✅ 373,4 GiB / 24 756 Dateien, 5 h 34 min, 0 Fehler |
+| Speicher | ≥ 3,6 TB frei | ⚠️ 5,3 TB beim Start; 2,7 TB nach Löschung (fehlendes `fstrim`), bewertet nach Korrektur F.0 → weiter |
 
 ---
 
@@ -2437,12 +2447,14 @@ kubectl logs -n opencloud job/mig-copy-delta --tail=10
 ## G.3 — Inhaltsprüfung per Dropbox-Hash
 
 ```bash
-kubectl create job -n opencloud --from=cronjob/migration-check mig-check-1
-kubectl wait -n opencloud --for=condition=complete job/mig-check-1 --timeout=24h
-kubectl logs -n opencloud job/mig-check-1 | sed -n '/== Zusammenfassung ==/,$p'
+kubectl create job -n opencloud --from=cronjob/migration-check mig-check-2
+kubectl wait -n opencloud --for=condition=complete job/mig-check-2 --timeout=24h
+kubectl logs -n opencloud job/mig-check-2 | sed -n '/== Zusammenfassung ==/,$p'
 ```
 
-> **⚠️ Stolperstein 12 — kein gemeinsamer Hash.** `rclone check dropbox: opencloud:` würde nur Größen vergleichen — Dropbox hat einen eigenen Hash-Typ, WebDAV liefert SHA1/MD5. Deshalb vergleicht der Prüf-Job gegen den **lokalen** Baum: rclone berechnet dort den Dropbox-Hash selbst. Kosten: einmal den Bestand von der QNAP lesen (Stunden), aber kein zweiter Download aus Dropbox.
+Ablauf im Job: `rclone hashsum dropbox dropbox: … --output-file /work/dropbox.sum` (nur Metadaten, ~10–20 Min), dann `rclone checksum dropbox /work/dropbox.sum opencloud: --download --one-way --checkers 8` — jede Datei wird über WebDAV gelesen und der Dropbox-Hash selbst berechnet. ~923 GiB bei ~60–98 MiB/s ≈ 3–4 h; nichts aus dem Internet.
+
+> **⚠️ Stolperstein 12 — kein gemeinsamer Hash (korrigiert 23.11.2026).** `rclone check dropbox: opencloud:` vergleicht nur Größen — Dropbox hat einen eigenen Hash-Typ, WebDAV liefert SHA1/MD5. Der ursprüngliche Ausweg (Daten-PVC lesend in den Prüf-Job einhängen) funktioniert mit Trident nicht (`already mounted`, F.2). Lösung: Dropbox-Hashes aus der API holen und über WebDAV mit `checksum --download` prüfen. Das prüft zugleich den echten Lesepfad der Clients.
 
 ## G.4 — Bewertung
 
@@ -2451,21 +2463,51 @@ kubectl logs -n opencloud job/mig-check-1 | sed -n '/== Zusammenfassung ==/,$p'
 | `fehlt` = 0, `abweichend` = 0, `Fehler` = 0 | ✅ Migration inhaltlich vollständig |
 | Abweichungen nur bei Paper-Exporten (`.paper`, `.html`, `.md` aus Paper) | ✅ erklärbar — Exporte haben keinen Dropbox-Hash; Stichprobe öffnen |
 | `fehlt` > 0 | erneuten `migration-copy`-Lauf starten, danach G.3 wiederholen; bleibt es → STOPP mit Liste |
-| `abweichend` > 0 außerhalb von Paper | STOPP mit Liste (mögliche Ursache: Datei in Dropbox während der Kopie geändert) |
+| `abweichend` > 0 außerhalb von Paper | STOPP mit Liste (mögliche Ursache: Datei in Dropbox während der Kopie geändert — oder gekippte Bits, G.4a/G.4b) |
+
+## G.4a — Reparatur abweichender Dateien *(seit 24.11.2026)*
+
+```bash
+kubectl create job -n opencloud --from=cronjob/migration-repair mig-repair-1
+kubectl wait -n opencloud --for=condition=complete job/mig-repair-1 --timeout=14h
+kubectl logs -n opencloud job/mig-repair-1 | grep -E 'Zusammenfassung|gleich:|fehlt:|abweichend:|Fehler:|Neu zu|Nachprüfung'
+```
+
+Der Job prüft vollständig wie G.3, überträgt abweichende und fehlende Dateien mit `--files-from --ignore-times --no-traverse` neu aus Dropbox und prüft nur diese erneut. Die alte Fassung jeder Datei landet im OpenCloud-Papierkorb. Erwartung: Nachprüfung 0 abweichend.
+
+## G.4b — Diagnose gekippter Bits *(24.11.2026)*
+
+`mig-check-2` fand **64 Dateien mit abweichendem Hash** bei 0 fehlenden und 0 Fehlern — nur große Dateien (Raw-Fotos, WAV, Videos, Disk-Images), aus der Vorbefüllung wie aus dem Dropbox-Download. An zwei Dateien belegt: jeweils **genau ein Bit gekippt**, dauerhaft gespeichert, Quelle (PrivateCloud und Dropbox) korrekt. Stolperstein 40.
+
+| Schritt | Ergebnis |
+|---|---|
+| Verdacht 1: Arbeitsspeicher von `talos-5tn-o10` (Migrationspfad lief dort) | Postgres-Primary umgezogen, Node per cordon/drain geleert, `memtester 11G 5` als privilegierter Pod: **5 Durchläufe, 0 Fehler** → entlastet |
+| `mig-repair-1` auf `talos-hi4-31w` | volle Prüfung 55 abweichend (19 davon **neu**, 42 der 64 diesmal unauffällig); 55 neu übertragen; Nachprüfung **6 weiterhin abweichend** |
+| Gegenprobe einer „neuen“ Datei | dreimal gelesen, Hash jedes Mal korrekt → die Prüfung selbst hatte falsch gelesen |
+| `readtest` (3 Durchläufe, Dateien ≥ 500 MB in `0_PRIVAT`, je ~175 GiB) | OpenCloud 2/5/5, **NFS direkt 3/8/7** Abweichungen, fast immer andere Dateien; nur 1 Datei in 3/3 (beim Reparieren falsch geschrieben) |
+
+**Befund:** Bits kippen beim Schreiben **und** Lesen, über iSCSI **und** NFS, auf verschiedenen Nodes → Ursache in der QNAP. Wahrscheinlich ihr Arbeitsspeicher: 2 × 8 GB ohne ECC, selbst nachgerüstet, außerhalb der Spezifikation (TS-453B: höchstens 8 GB). ext4 auf mdraid hat keine Datenprüfsummen; es fällt nur durch die Hash-Prüfung auf. Rate ≈ ein Bit je 35 GiB.
+
+**Weiter:** Speichertest der QNAP mit je einem Riegel im Wartungsfenster 29.11.2026 (lokales Wartungsrezept, Phase 10; Messung mit `migration-readtest`, `PASSES=1`). Danach mit gesundem Speicher: `mig-repair-2`, vollständige Prüfung, G.4 abschließen. **Bis dahin keine Blöcke H ff. und Dropbox nicht kündigen** — Dropbox ist die einzige verlässliche Quelle.
 
 ### Ergebnisprotokoll Block G
 
 | Prüfpunkt | Erwartung | Ist |
 |---|---|---|
-| Vollkopie: Dauer, Fehler | —, 0 | |
-| Delta: übertragen | ≈ 0 | |
-| Check: gleich / fehlt / abweichend / Fehler | n / 0 / 0 / 0 | |
+| Vollkopie: Dauer, Fehler | —, 0 | ✅ `mig-copy-2` 5 h 34 min, 0 (Block F) |
+| Delta: übertragen | ≈ 0 | ✅ `mig-copy-delta` 0 B, 0 Fehler, 15 min (23.11.) |
+| Check: gleich / fehlt / abweichend / Fehler | n / 0 / 0 / 0 | ❌ `mig-check-2` (23./24.11.): 95 291 / 0 / **64** / 0 von 95 355 Dropbox-Hashes |
+| Reparatur: neu übertragen / Nachprüfung abweichend | — / 0 | ⚠️ `mig-repair-1` (24.11.): 55 / **6** — Ursache QNAP-Speicher (G.4b) |
+| Lesetest OpenCloud / NFS (3 × ~175 GiB) | 0 / 0 | ❌ 12 / 18 (24.11.) |
+| Abschluss nach Speichertest | n / 0 / 0 / 0 | offen (nach 29.11.2026) |
 
 ---
 
 # Block H — Backup *(1 HALT)*
 
 ## H.1 — Bestandsaufnahme *(Claude Code)*
+
+> **Eingangsprüfung (seit 1.3):** G.4 abgeschlossen (Hash-Prüfung 0 abweichend, nach dem Speichertest der QNAP). Und **vor den ersten Snapshots `fstrim` auf der OpenCloud-LUN** (privilegierter Einmalschritt mit Rico; der Namespace `opencloud` erlaubt keine Privilegien): Nach den Löschungen in F.4a hält die LUN ~2,5 TB, die OpenCloud nicht mehr nutzt. Ohne `fstrim` frieren Snapshots diese Blöcke ein und die Snapshot-Reserve wird falsch berechnet.
 
 ```bash
 # PVC -> PV -> QNAP-LUN-Name (für die Snapshot-Planung)
@@ -2736,6 +2778,8 @@ kubectl logs -n opencloud job/offsite-verify-1
 
 # Block I — Umstieg *(2 HALTs)*
 
+> **Vor Block I prüfen (seit 1.3):** Kann der Mac-Client (ab 4.0.0) virtuelle Dateien/Platzhalter? Sonst lädt er den ganzen Bestand (~1 TB) auf den Mac — selektive Synchronisation vor dem Fortsetzen festlegen. Die Synchronisation ist seit F.4a angehalten.
+
 ## I.1 — ⏸ HALT: Dropbox einfrieren *(Rico, ~10 Min)*
 
 > **⏸ HALT [Rico]**
@@ -2890,7 +2934,7 @@ bekommt einen eigenen Zugang.
 
 ```bash
 git rm -r apps/pantheon/opencloud/migration/
-# kustomization.yaml: die drei migration/*-Einträge entfernen
+# kustomization.yaml: alle migration/*-Einträge entfernen (Stand 1.3: vier, inkl. seed-nfs.yaml)
 kubectl kustomize apps/pantheon/opencloud/ > /dev/null && echo BUILD_OK
 git add apps/pantheon/opencloud/kustomization.yaml
 git commit -m "chore(opencloud): remove dropbox migration jobs after cutover"
@@ -2900,6 +2944,8 @@ flux reconcile kustomization flux-system --with-source
 kubectl get cronjob,secret -n opencloud | grep -i migration || echo MIGRATION_REMOVED
 ```
 
+> **Außerdem (seit 1.3):** NFS-Export `/PrivateCloud` in QTS entfernen (Rico); PV `opencloud-privatecloud-seed-nfs` hat `Retain` und verschwindet mit dem Prune, die Daten auf der QNAP bleiben unberührt. Zwei Müll-Dateien aus der Vorbefüllung (eine `.smbdelete*`, eine `~$*.docx`) in OpenCloud löschen — Pfade im Sitzungsprotokoll, nicht im Repository.
+>
 > `git rm` hat die Löschungen bereits vorgemerkt; `git add` nimmt nur die geänderte `kustomization.yaml` dazu. Das SOPS-verschlüsselte Secret bleibt in der Git-Historie. Weil Dropbox-App und App-Token widerrufen sind, ist es wertlos.
 
 ---
@@ -3075,6 +3121,15 @@ Reihenfolge = empfohlene Priorität, jeweils mit dem Risiko bis dahin.
 ---
 
 ## Rezept-Changelog
+
+**1.3 (25.11.2026)** — Blöcke F und G nach Durchführung (20.–24.11.2026).
+- **F.1:** Dropbox-App braucht fünf Berechtigungen (Stolperstein 37); App-Token per `opencloud auth-app create` (Dienst `auth-app` in `OC_ADD_RUN_SERVICES`); WebDAV-Benutzer ist die **Keycloak-ID**, nicht `rico` (Stolperstein 38); Secret-Erzeugung als Skriptdatei statt Einfügeblock.
+- **F.2:** Skript beschrieben statt abgedruckt (Modi `probe`, `test`, `seed`, `copy`, `check`, `repair`, `readtest`); `migration-check` ohne Daten-Volume (Trident `already mounted`).
+- **F.0/F.3/F.4a/F.5:** Ergebnis Vergleich PrivateCloud, Vorbefüllung per NFS (nur lesend), `--timeout 1h` gegen Upload-Schleifen (Stolperstein 39), gelöschter Altordner (865 GB), QNAP-Müll-Ausschlüsse, `copy` statt `sync`, Desktop-Client pausieren, korrigierte Speicherschwelle mit `fstrim` vor Block H.
+- **G.3/G.4a/G.4b:** Hash-Prüfung über WebDAV (Stolperstein 12 korrigiert), Reparaturmodus, Diagnose gekippter Bits mit Ursache QNAP-Speicher (Stolperstein 40); G offen bis nach dem Speichertest am 29.11.2026.
+- **H/I/J:** Eingangsprüfung H (G.4 erledigt, `fstrim`), Hinweis virtuelle Dateien vor I, J.1 entfernt auch NFS-Export und Müll-Dateien.
+- **Ergebnisprotokolle F und G** ausgefüllt, Blockplan: F ✅ 23.11.2026, G ⏸.
+
 
 **1.2 (16.11.2026)** — Ergebnisse aus Teil 0, Entscheidungen Rico vom selben Tag.
 - **Identität (Architekturentscheidung 3 neu):** Autoprovisioning ins eingebaute OpenCloud-Verzeichnis `idm` statt Keycloak + OpenLDAP. Grund: einziges Upstream-LDAP-Image `bitnamilegacy/openldap:2.6` seit 19.08.2025 ohne Updates. C.3.1 (OpenLDAP), LDAP-Passwort in A.2, LDAP-Prüfungen in C.4/C.6/E.1, LDAP-Export in H und `ldap-data` entfallen. Realm-Datei aus `opencloud-realm-autoprovisioning.dist.json` (Konten und Gruppen geleert, `opencloudGuest` als Default-Rolle). D.4 mit `PROXY_AUTOPROVISION_ACCOUNTS=true`, `sub` als Benutzerkennung, Rollen aus Claim `roles`, `OC_EXCLUDE_RUN_SERVICES=idp`. Neue Stolpersteine 27 (Konto erst nach erster Anmeldung) und 28 (Konten in zwei Systemen); Stolperstein 1 auf die Realm-Datei umgeschrieben; D.9 prüft die Benutzerliste (kein `admin`).

@@ -73,6 +73,6 @@ Monatlich am letzten Sonntag (nächstes: 29.11.2026). Arbeitsgrundlage liegt lok
 
 ## Laufendes Vorhaben
 
-**OpenCloud** (Dateiablage statt Dropbox, Dropbox wird danach gekündigt): `docs/rezepte/rezept-opencloud-pantheon.md`. Der Stand steht im Blockplan des Rezepts. Blöcke laufen bis zum nächsten ⏸ HALT durch; Schritte für Rico mit kopierfertigem Block oder genauem Klickpfad übergeben. `cloudflared` führt nur Rico aus.
+**OpenCloud** (Dateiablage statt Dropbox, Dropbox wird danach gekündigt): `docs/rezepte/rezept-opencloud-pantheon.md`. Der Stand steht im Blockplan des Rezepts. **Stand 25.11.2026:** Block G ruht (G.4b: gekippte Bits durch den QNAP-Speicher); weiter erst nach dem Speichertest im Wartungsfenster 29.11.2026, Dropbox bis dahin nicht kündigen. Blöcke laufen bis zum nächsten ⏸ HALT durch; Schritte für Rico mit kopierfertigem Block oder genauem Klickpfad übergeben. `cloudflared` führt nur Rico aus.
 
 AFFiNE ist abgeschlossen (`docs/rezepte/rezept-affine-pantheon.md`); offen ist dort nur der erste Renovate-Pull-Request.
